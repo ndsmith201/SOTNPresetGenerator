@@ -1,0 +1,27 @@
+{
+  "name": "sotn-preset-generator",
+  "version": "0.1.0",
+  "description": "A desktop UI for assembling Symphony of the Night presets.",
+  "main": "dist/main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/build-renderer.mjs",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "esbuild": "^0.25.9",
+    "electron": "^44.1.1",
+    "typescript": "^5.9.2"
+  }
+}

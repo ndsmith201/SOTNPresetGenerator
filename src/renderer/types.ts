@@ -1,0 +1,89 @@
+export type OptionCategory = "world" | "gameplay" | "items" | "relics" | "challenge";
+export type WriteType = "char" | "short" | "word" | "long" | "string";
+export type MetaExtension = "Guarded" | "GuardedPlus" | "Equipment" | "Scenic" | "Extended" | "Classic";
+export type OptionFilter = "all" | "selected";
+export type JsonObject = Record<string, unknown>;
+export type WriteEntry = Record<string, unknown>;
+
+export interface BuiltInSettings {
+  colorrandoMode: boolean;
+  stats: boolean;
+  turkeyMode: boolean;
+  music: boolean;
+  fastwarpMode: boolean;
+  magicmaxMode: boolean;
+  surpriseMode: boolean;
+  antiFreezeMode: boolean;
+  noprologueMode: boolean;
+  enemyStatRandoMode: boolean;
+  shopPriceRandoMode: boolean;
+  startRoomRandoMode: boolean;
+  startRoomRando2ndMode: boolean;
+  rlbcMode: boolean;
+}
+
+export interface Preset {
+  id: string;
+  name: string;
+  optionIds: string[];
+  complexity: number;
+  metaExtension: MetaExtension;
+  builtInSettings: BuiltInSettings;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DatabaseOption {
+  id: number;
+  comment: string;
+  category: OptionCategory;
+  type: WriteType;
+  value: string;
+  address: string | null;
+  gameInit: boolean;
+  rawJson: boolean;
+  additionalWrites: WriteEntry[];
+}
+
+export interface PresetOption {
+  id: string;
+  label: string;
+  description: string;
+  category: OptionCategory;
+  injectedWrites: WriteEntry[];
+  gameInitWrites: WriteEntry[];
+  appendedWrites: WriteEntry[];
+  previewJson: JsonObject | null;
+}
+
+export interface CreateOptionInput {
+  comment: string;
+  category: OptionCategory;
+  type: WriteType;
+  value: string;
+  address?: string;
+  gameInit?: boolean;
+  rawJson?: boolean;
+  additionalWrites?: WriteEntry[];
+}
+
+export interface PresetAppApi {
+  platform: string;
+  version: string;
+  getPresetTemplate: () => Promise<unknown>;
+  listOptions: () => Promise<unknown>;
+  createOption: (request: CreateOptionInput) => Promise<unknown>;
+  chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
+  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string }) => Promise<unknown>;
+  windowControls: {
+    minimize: () => void;
+    toggleMaximize: () => void;
+    close: () => void;
+  };
+}
+
+declare global {
+  interface Window {
+    presetApp: PresetAppApi;
+  }
+}
