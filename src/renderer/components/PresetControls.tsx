@@ -1,12 +1,13 @@
-import { MAX_COMPLEXITY, META_EXTENSIONS, MIN_COMPLEXITY } from "../constants";
+import { META_EXTENSIONS, MIN_COMPLEXITY } from "../constants";
 import type { MetaExtension } from "../types";
 
-export function ComplexityControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+export function ComplexityControl({ value, maximum, onChange }: { value: number; maximum: number; onChange: (value: number) => void }) {
+  const minimum = Math.min(MIN_COMPLEXITY, maximum);
   return (
     <section className="complexity-control" aria-labelledby="complexityLabel">
-      <div className="complexity-heading"><div><strong id="complexityLabel">Complexity target</strong><span>Minimum logic depth; higher values can take longer to generate.</span></div><output>{value}</output></div>
-      <input type="range" min={MIN_COMPLEXITY} max={MAX_COMPLEXITY} step="1" value={value} aria-labelledby="complexityLabel" onChange={(event) => onChange(Number(event.target.value))} />
-      <div className="complexity-scale" aria-hidden="true"><span>{MIN_COMPLEXITY}</span><span>{MAX_COMPLEXITY}</span></div>
+      <div className="complexity-heading"><div><strong id="complexityLabel">Complexity target</strong><span id="complexityHelp">{maximum === 0 ? "Starting relics already open every check through Trio." : `Maximum ${maximum}, based on starting relics and checks through Trio.`}</span></div><output>{value}</output></div>
+      <input type="range" min={minimum} max={maximum} step="1" value={value} disabled={maximum === minimum} aria-labelledby="complexityLabel" aria-describedby="complexityHelp" onChange={(event) => onChange(Number(event.target.value))} />
+      <div className="complexity-scale" aria-hidden="true"><span>{minimum}</span><span>{maximum}</span></div>
     </section>
   );
 }

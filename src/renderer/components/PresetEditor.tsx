@@ -5,6 +5,7 @@ import { OptionsPane } from "./OptionsPane";
 interface PresetEditorProps {
   preset: Preset;
   options: PresetOption[];
+  maximumComplexity: number;
   preview: JsonObject | null;
   onChange: (changes: Partial<Preset>) => void;
   onNewOption: () => void;
@@ -12,5 +13,10 @@ interface PresetEditorProps {
 }
 
 export function PresetEditor(props: PresetEditorProps) {
-  return <main className="workspace"><OptionsPane preset={props.preset} options={props.options} onChange={props.onChange} onNewOption={props.onNewOption} /><JsonPreview preview={props.preview} optionCount={props.preset.optionIds.length} onCopy={props.onCopy} /></main>;
+  return (
+    <main className="workspace">
+      <OptionsPane preset={props.preset} options={props.options} maximumComplexity={props.maximumComplexity} onChange={props.onChange} onNewOption={props.onNewOption} />
+      <JsonPreview preview={props.preview} onCopy={props.onCopy} />
+    </main>
+  );
 }

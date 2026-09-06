@@ -3,7 +3,6 @@ import {
   DEFAULT_BUILT_IN_SETTINGS,
   DEFAULT_COMPLEXITY,
   DEFAULT_META_EXTENSION,
-  MAX_COMPLEXITY,
   META_EXTENSIONS,
   MIN_COMPLEXITY,
   OPTION_GROUPS,
@@ -19,14 +18,132 @@ import type {
   PresetOption,
   WriteEntry
 } from "./types";
+import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
+
+const EARLY_TRANSFORM_OPTION_LABELS = new Set([
+  "Enable Soul of Bat",
+  "Enable Soul of Wolf",
+  "Enable Form of Mist"
+]);
+
+const FLIGHT_METHODS = [
+  ["Soul of Bat"],
+  ["Leap Stone", "Gravity Boots"],
+  ["Form of Mist", "Power of Mist"]
+];
+
+const FLIGHT_SATISFIED_REQUIREMENTS = [
+  ...FLIGHT_METHODS,
+  ["Soul of Wolf", "Power of Wolf"]
+];
+
+const VLAD_RELICS = new Set(["Heart of Vlad", "Tooth of Vlad", "Rib of Vlad", "Ring of Vlad", "Eye of Vlad"]);
 
 export function isJsonObject(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export function normalizeComplexity(value: unknown): number {
-  if (typeof value !== "number" || !Number.isInteger(value)) return DEFAULT_COMPLEXITY;
-  return Math.min(MAX_COMPLEXITY, Math.max(MIN_COMPLEXITY, value));
+export function normalizeComplexity(value: unknown, maximum = Number.MAX_SAFE_INTEGER): number {
+  const candidate = typeof value === "number" && Number.isSafeInteger(value) ? value : DEFAULT_COMPLEXITY;
+  return Math.min(maximum, Math.max(Math.min(MIN_COMPLEXITY, maximum), candidate));
+}
+
+function getEnabledRelics(selected: PresetOption[]): Set<string> {
+  return new Set(selected
+    .filter((option) => option.category === "relics" && option.label.startsWith("Enable "))
+    .map((option) => option.label.slice("Enable ".length).trim()));
+}
+
+/** Longest sequence of check-opening pickups, plus final Vlad completion.
+ * Relic placement is unknown: setup pickups are allowed, but score zero.
+ */
+export function calculateMaxComplexity(template: JsonObject | null, selected: PresetOption[] = []): number {
+  let locations = template?.lockLocation;
+  let complexityGoal = template?.complexityGoal;
+  for (const option of selected) {
+    if (option.previewJson && Object.hasOwn(option.previewJson, "lockLocation")) locations = option.previewJson.lockLocation;
+    if (option.previewJson && Object.hasOwn(option.previewJson, "complexityGoal")) complexityGoal = option.previewJson.complexityGoal;
+  }
+  if (!Array.isArray(locations)) return 0;
+  const routes: string[][][] = [];
+  for (const location of locations) {
+    if (!isJsonObject(location)) continue;
+    if (Array.isArray(location.locks)) {
+      routes.push(location.locks.filter((lock): lock is string => typeof lock === "string")
+        .map((lock) => lock.split("+").map((relic) => relic.trim()).filter(Boolean)));
+    }
+    if (location.location === "Trio") break;
+  }
+  const enabled = getEnabledRelics(selected);
+  const goals = isJsonObject(complexityGoal) && Array.isArray(complexityGoal.goals)
+    ? complexityGoal.goals.filter((goal): goal is string => typeof goal === "string") : [];
+  // The last required Vlad completes the goal rather than opening a check.
+  // Count that terminal step once, not once for each missing Vlad relic.
+  const finalVladStep = goals.length > 0 && goals.every((goal) => goal.split("+")
+    .some((requirement) => VLAD_RELICS.has(requirement.trim()) && !enabled.has(requirement.trim())));
+  const requiredRelics = routes.flat(2);
+  const movementRelics = FLIGHT_SATISFIED_REQUIREMENTS.flat();
+  const usesMovement = requiredRelics.some((relic) => movementRelics.includes(relic));
+  const relics = [...new Set([...requiredRelics, ...(usesMovement ? movementRelics : [])])];
+  const bits = new Map(relics.map((relic, index) => [relic, 1n << BigInt(index)]));
+  const mask = (names: string[]) => names.reduce((value, name) => value | (bits.get(name) ?? 0n), 0n);
+  const flightMasks = usesMovement ? FLIGHT_METHODS.map(mask) : [];
+  const jumpMask = mask(["Leap Stone", "Gravity Boots"]);
+  const methods = FLIGHT_SATISFIED_REQUIREMENTS.map((names) => ({ names, mask: mask(names) }));
+  const checks = routes.map((alternatives) => {
+    // If every route needs Mist and some use another movement method, Mist
+    // serves as entry as well as flight (for example, Soul of Bat's location).
+    const mistEntry = alternatives.length > 0 && alternatives.every((route) => route.includes("Form of Mist")) &&
+      alternatives.some((route) => !route.includes("Power of Mist"));
+    return alternatives.map((requirements) => {
+      const required = mask(requirements);
+      let withFlight = required & ~jumpMask;
+      for (const method of methods) {
+        // Bat still has a distinct use with Echo; standalone Mist is a barrier.
+        if (method.names.includes("Soul of Bat") && requirements.includes("Echo of Bat")) continue;
+        if ((required & method.mask) === method.mask) withFlight &= ~method.mask;
+      }
+      if (mistEntry) withFlight |= mask(["Form of Mist"]);
+      return { required, withFlight };
+    });
+  });
+  const allChecks = (1n << BigInt(checks.length)) - 1n;
+  const allRelics = mask(relics);
+  const start = mask([...enabled]);
+  const accessCache = new Map<bigint, bigint>();
+  const access = (inventory: bigint): bigint => {
+    const cached = accessCache.get(inventory);
+    if (cached !== undefined) return cached;
+    const flight = flightMasks.some((method) => (inventory & method) === method);
+    let accessible = 0n;
+    checks.forEach((alternatives, index) => {
+      if (!alternatives.length || alternatives.some((route) => {
+        const required = flight ? route.withFlight : route.required;
+        return (inventory & required) === required;
+      })) accessible |= 1n << BigInt(index);
+    });
+    accessCache.set(inventory, accessible);
+    return accessible;
+  };
+  const memo = new Map<bigint, number>();
+  const longest = (inventory: bigint): number => {
+    const cached = memo.get(inventory);
+    if (cached !== undefined) return cached;
+    const before = access(inventory);
+    if (before === allChecks) return 0;
+    let best = 0;
+    let remaining = allRelics & ~inventory;
+    while (remaining) {
+      const nextRelic = remaining & -remaining;
+      remaining &= ~nextRelic;
+      const next = inventory | nextRelic;
+      const opensCheck = access(next) !== before;
+      best = Math.max(best, Number(opensCheck) + longest(next));
+    }
+    memo.set(inventory, best);
+    return best;
+  };
+  return longest(start) + Number(finalVladStep);
 }
 
 export function normalizeMetaExtension(value: unknown): MetaExtension {
@@ -151,23 +268,111 @@ function isGameInitAnchor(write: WriteEntry): boolean {
   );
 }
 
+function removeEnabledRelicsFromLocks(preview: JsonObject, selected: PresetOption[]): void {
+  const enabledRelics = getEnabledRelics(selected);
+  if (!enabledRelics.size || !Array.isArray(preview.lockLocation)) return;
+  const enabledFlightMethods = FLIGHT_METHODS.filter((method) => method.every((relic) => enabledRelics.has(relic)));
+  const hasFlight = enabledFlightMethods.length > 0;
+
+  for (const location of preview.lockLocation) {
+    if (!isJsonObject(location)) continue;
+    // Escape entries are alternatives; every relic within one '+' combination
+    // must be enabled. Keep unsatisfied alternatives intact for placement logic.
+    if (Array.isArray(location.escapeRequires) && location.escapeRequires.some((escape: unknown) => {
+      if (typeof escape !== "string") return false;
+      const requirements = escape.split("+").map((relic) => relic.trim());
+      return requirements.every((relic) => relic.length > 0 && enabledRelics.has(relic));
+    })) {
+      location.escapeRequires = [];
+    }
+    if (!Array.isArray(location.locks)) continue;
+    // Rib of Vlad's jump routes need a transformation as well as height.
+    // Use the enabled movement route, rather than substituting it for Bat.
+    const useEnabledVladRoute = hasFlight && location.location === "Rib of Vlad" && !enabledRelics.has("Form of Mist");
+    // Shotel keeps its entry requirements; Staurolite also keeps Holy glasses
+    // when Mist is enabled instead of turning that route into an unlocked one.
+    const preserveMistEntry = location.location === "Shotel" ||
+      (location.location === "Staurolite" && enabledRelics.has("Form of Mist"));
+    // The Elixir's jump route needs Spike Breaker, Bat needs Holy glasses,
+    // and full Mist unlocks it. Prefer Mist, then Bat, when routes overlap.
+    const elixirRoute = location.location === "Floating Catacombs Elixir"
+      ? enabledFlightMethods.find((method) => method.includes("Form of Mist")) ?? enabledFlightMethods[0]
+      : undefined;
+    const locks = location.locks.flatMap((lock: unknown) => {
+      if (typeof lock !== "string") return [lock];
+      let requirements = lock.split("+").map((requirement) => requirement.trim());
+      if (elixirRoute) {
+        if (!elixirRoute.every((relic) => requirements.includes(relic))) return [];
+        if (elixirRoute.includes("Form of Mist")) {
+          requirements = requirements.filter((relic) => relic !== "Holy glasses");
+        }
+      }
+      if (useEnabledVladRoute && !FLIGHT_METHODS.some((method) =>
+        method.every((relic) => enabledRelics.has(relic) && requirements.includes(relic))
+      )) return [];
+      // Spike Breaker and the key still gate the spike corridor even with flight.
+      const mistSpikeBarrier = requirements.includes("Form of Mist") && requirements.includes("Spike Breaker");
+      if (mistSpikeBarrier || (preserveMistEntry && requirements.includes("Form of Mist"))) {
+        requirements = ["Form of Mist", ...requirements.filter((relic) => relic !== "Form of Mist")];
+      }
+      if (hasFlight && !useEnabledVladRoute && !mistSpikeBarrier && !preserveMistEntry && requirements.includes("Form of Mist") && !requirements.includes("Power of Mist")) {
+        // Flight satisfies the accompanying requirements, but Mist is still
+        // needed for the barrier unless it is explicitly enabled as well.
+        requirements = ["Form of Mist"];
+      }
+      const satisfied = new Set(enabledRelics);
+      if (hasFlight) {
+        // Flight also covers double-jump and high-jump requirements.
+        satisfied.add("Leap Stone");
+        satisfied.add("Gravity Boots");
+        // Match whole methods before removing selected relics, so partial pairs
+        // still require their missing relic when they serve another purpose.
+        for (const method of FLIGHT_SATISFIED_REQUIREMENTS) {
+          // Echo of Bat requires the actual Bat form, not another flight method.
+          if (method.includes("Soul of Bat") && requirements.includes("Echo of Bat")) continue;
+          if (method.every((relic) => requirements.includes(relic))) {
+            method.forEach((relic) => {
+              if (!preserveMistEntry || relic !== "Form of Mist") satisfied.add(relic);
+            });
+          }
+        }
+      }
+      const remaining = requirements.filter((requirement) => !satisfied.has(requirement));
+      // Discard redundant flight alternatives without erasing a remaining
+      // barrier. Only explicitly enabled requirements can unlock all routes.
+      if (!remaining.length && !requirements.every((relic) => enabledRelics.has(relic))) return [];
+      return [remaining.join(" + ")];
+    });
+    // Lock entries are alternatives: one satisfied alternative unlocks the location.
+    location.locks = locks.includes("") ? [] : [...new Set(locks)];
+  }
+}
+
 export function buildPreviewPreset(
   template: JsonObject | null,
   preset: Preset | null,
-  options: PresetOption[]
+  options: PresetOption[],
+  author?: string,
+  maximumComplexity?: number
 ): JsonObject | null {
   if (!template || !preset) return null;
   const preview = structuredClone(template);
+  const extension = normalizeMetaExtension(preset.metaExtension);
+  const selected = options.filter((option) => preset.optionIds.includes(option.id));
+  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculateMaxComplexity(template, selected));
+  const earlyTransformEnabled = selected.some((option) => EARLY_TRANSFORM_OPTION_LABELS.has(option.label));
   const metadata = isJsonObject(preview.metadata) ? preview.metadata : {};
   metadata.id = presetIdFromName(preset.name);
   metadata.name = preset.name;
-  metadata.metaComplexity = normalizeComplexity(preset.complexity).toString();
-  metadata.metaExtension = normalizeMetaExtension(preset.metaExtension);
+  metadata.metaComplexity = complexity.toString();
+  metadata.metaExtension = extension;
+  metadata.transformEarly = earlyTransformEnabled;
+  metadata.transformFocus = earlyTransformEnabled;
   preview.metadata = metadata;
-  preview.relicLocationsExtension = preset.metaExtension === "Classic" ? false : preset.metaExtension.toLowerCase();
+  preview.relicLocationsExtension = extension === "Classic" ? false : extension.toLowerCase();
 
   const complexityGoal = isJsonObject(preview.complexityGoal) ? preview.complexityGoal : {};
-  complexityGoal.min = normalizeComplexity(preset.complexity);
+  complexityGoal.min = complexity;
   preview.complexityGoal = complexityGoal;
   BUILT_IN_TOGGLES.forEach(({ key }) => {
     preview[key] = preset.builtInSettings[key];
@@ -176,7 +381,6 @@ export function buildPreviewPreset(
   const templateWrites = Array.isArray(preview.writes)
     ? preview.writes.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
-  const selected = options.filter((option) => preset.optionIds.includes(option.id));
   const injected = selected.flatMap((option) => structuredClone(option.injectedWrites));
   const gameInit = selected.flatMap((option) => structuredClone(option.gameInitWrites));
   const appended = selected.flatMap((option) => structuredClone(option.appendedWrites));
@@ -191,10 +395,29 @@ export function buildPreviewPreset(
   }
   templateWrites.push(...appended);
   preview.writes = templateWrites;
-  return selected.reduce(
+  const merged = selected.reduce(
     (merged, option) => option.previewJson ? { ...merged, ...structuredClone(option.previewJson) } : merged,
     preview
   );
+  const mergedMetadata = isJsonObject(merged.metadata) ? merged.metadata : {};
+  mergedMetadata.id = presetIdFromName(preset.name);
+  mergedMetadata.name = preset.name;
+  mergedMetadata.metaComplexity = complexity.toString();
+  mergedMetadata.metaExtension = extension;
+  if (author?.trim()) mergedMetadata.author = [author.trim()];
+  merged.metadata = mergedMetadata;
+  merged.complexityGoal = { ...(isJsonObject(merged.complexityGoal) ? merged.complexityGoal : {}), min: complexity };
+  // Enforce the selected extension after raw options, so they cannot reintroduce
+  // excluded checks or change the extension behind the selector's back.
+  merged.relicLocationsExtension = preview.relicLocationsExtension;
+  if (Array.isArray(merged.lockLocation)) {
+    const allowedLocations = new Set(RELIC_LOCATION_CHECKS[extension]);
+    merged.lockLocation = merged.lockLocation.filter((entry) =>
+      isJsonObject(entry) && typeof entry.location === "string" && allowedLocations.has(entry.location)
+    );
+  }
+  removeEnabledRelicsFromLocks(merged, selected);
+  return merged;
 }
 
 export function syntaxHighlight(json: string): string {

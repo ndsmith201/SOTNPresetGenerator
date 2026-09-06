@@ -29,25 +29,6 @@
       "Normal"
     ]
   },
-  "startingEquipment": [{
-    "slot": "Right hand",
-    "item": null
-  }, {
-    "slot": "Left hand",
-    "item": null
-  }, {
-    "slot": "Head",
-    "item": null
-  }, {
-    "slot": "Body",
-    "item": null
-  }, {
-    "slot": "Cloak",
-    "item": null
-  }, {
-    "slot": "Other",
-    "item": null
-  }],
   "colorrandoMode": true,
   "stats": false,
   "turkeyMode": true,
@@ -1037,6 +1018,11 @@
         "Soul of Bat",
         "Form of Mist + Power of Mist"
       ]
+    },
+    {
+      "location": "Telescope",
+      "comment": "No Requirements",
+      "locks": []
     },
     {
       "location": "Colosseum Green tea",

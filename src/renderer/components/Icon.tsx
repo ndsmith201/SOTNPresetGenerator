@@ -15,6 +15,7 @@ export type IconName =
   | "plus"
   | "relic"
   | "search"
+  | "trash"
   | "spark";
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
@@ -33,6 +34,7 @@ export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGEle
     plus: <path d="M12 5v14M5 12h14" />,
     relic: <><circle cx="12" cy="12" r="7.5" /><path d="M12 7.5v9M7.5 12h9" /></>,
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>,
+    trash: <><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></>,
     spark: <><path d="m12 2 1.4 6.6L20 10l-6.6 1.4L12 18l-1.4-6.6L4 10l6.6-1.4L12 2Z" /><path d="m18.5 16 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z" /></>
   };
   return <svg viewBox={name === "check" ? "0 0 16 16" : "0 0 24 24"} aria-hidden="true" {...props}>{paths[name]}</svg>;
