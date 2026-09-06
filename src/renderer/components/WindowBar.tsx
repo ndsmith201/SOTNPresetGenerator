@@ -6,6 +6,9 @@ interface WindowBarProps {
   compactMode: boolean;
   wrapJson: boolean;
   exportPath: string;
+  author: string;
+  onEditAuthor: () => void;
+  onDeletePreset: () => void;
   onNewPreset: () => void;
   onSavePreset: () => void;
   onShowLibrary: () => void;
@@ -39,6 +42,7 @@ export function WindowBar(props: WindowBarProps) {
             <button type="button" role="menuitem" onClick={() => act(props.onNewPreset)}><span>New preset</span><kbd>Ctrl N</kbd></button>
             {props.editing && <button type="button" role="menuitem" onClick={() => act(props.onSavePreset)}><span>Save preset</span><kbd>Ctrl S</kbd></button>}
             {props.editing && <button type="button" role="menuitem" onClick={() => act(props.onShowLibrary)}>Preset library</button>}
+            {props.editing && <button className="danger-text" type="button" role="menuitem" onClick={() => act(props.onDeletePreset)}>Delete preset…</button>}
             <span className="menu-separator" role="separator" />
             <button type="button" role="menuitem" onClick={() => window.presetApp.windowControls.close()}>Exit</button>
           </div>
@@ -52,6 +56,10 @@ export function WindowBar(props: WindowBarProps) {
             <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onChooseExportPath)}>
               <span className="path-menu-copy"><strong>Export directory</strong><small title={props.exportPath}>{props.exportPath || "Not selected"}</small></span>
               <Icon name="folder" />
+            </button>
+            <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onEditAuthor)}>
+              <span className="path-menu-copy"><strong>Preset author</strong><small title={props.author}>{props.author || "Use template author"}</small></span>
+              <Icon name="file" />
             </button>
           </div>
         </div>

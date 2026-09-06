@@ -2,7 +2,7 @@ import type { JsonObject } from "../types";
 import { syntaxHighlight } from "../preset-utils";
 import { Icon } from "./Icon";
 
-export function JsonPreview({ preview, optionCount, onCopy }: { preview: JsonObject | null; optionCount: number; onCopy: () => void }) {
+export function JsonPreview({ preview, onCopy }: { preview: JsonObject | null; onCopy: () => void }) {
   const json = preview ? JSON.stringify(preview, null, 2) : "";
   return (
     <aside className="preview-pane" aria-labelledby="preview-title">
@@ -11,7 +11,7 @@ export function JsonPreview({ preview, optionCount, onCopy }: { preview: JsonObj
         <div className="code-toolbar"><div className="file-label"><Icon name="file" />preset.json</div><span className="valid-indicator"><span /> Valid JSON</span></div>
         {preview ? <pre className="code-preview" aria-label="Generated JSON preview" dangerouslySetInnerHTML={{ __html: syntaxHighlight(json) }} /> : <div className="preview-placeholder"><div className="placeholder-icon"><Icon name="file" /></div><strong>Your preset starts here</strong><span>The preset template could not be loaded.</span></div>}
       </div>
-      <div className="preview-footer"><div className="meta-item"><span>Format</span><strong>JSON</strong></div><div className="meta-item"><span>Schema</span><strong>Draft</strong></div><div className="meta-item"><span>Options</span><strong>{optionCount}</strong></div></div>
+      <div className="preview-footer"><span className="draft-status"><span aria-hidden="true" /> Local draft</span></div>
     </aside>
   );
 }

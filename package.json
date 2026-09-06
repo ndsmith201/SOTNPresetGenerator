@@ -10,7 +10,8 @@
     "build": "tsc && node scripts/build-renderer.mjs",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test tests/*.test.cjs"
   },
   "dependencies": {
     "react": "^19.1.1",
