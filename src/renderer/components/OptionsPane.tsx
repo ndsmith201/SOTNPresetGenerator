@@ -12,9 +12,10 @@ interface OptionsPaneProps {
   maximumComplexity: number;
   onChange: (changes: Partial<Preset>) => void;
   onNewOption: () => void;
+  onEditOption: (option: PresetOption) => void;
 }
 
-export function OptionsPane({ preset, options, maximumComplexity, onChange, onNewOption }: OptionsPaneProps) {
+export function OptionsPane({ preset, options, maximumComplexity, onChange, onNewOption, onEditOption }: OptionsPaneProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OptionFilter>("all");
   const selected = useMemo(() => new Set(preset.optionIds), [preset.optionIds]);
@@ -53,7 +54,7 @@ export function OptionsPane({ preset, options, maximumComplexity, onChange, onNe
         </label>
         <div className="option-toolbar-actions"><button className="text-button add-option-button" type="button" onClick={onNewOption}>+ New option</button><button className="text-button" type="button" onClick={() => onChange({ optionIds: [] })}>Clear all</button></div>
       </div>
-      <OptionGroups groups={groups} selected={selected} onToggle={toggleOption} />
+      <OptionGroups groups={groups} selected={selected} onToggle={toggleOption} onEdit={onEditOption} />
     </section>
   );
 }

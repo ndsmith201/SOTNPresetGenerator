@@ -6,6 +6,9 @@ export type JsonObject = Record<string, unknown>;
 export type WriteEntry = Record<string, unknown>;
 
 export interface BuiltInSettings {
+  tournamentMode: boolean;
+  zeroDollarRelicMode: boolean;
+  openClockStatueMode: boolean;
   colorrandoMode: boolean;
   stats: boolean;
   turkeyMode: boolean;
@@ -35,12 +38,15 @@ export interface Preset {
 
 export interface DatabaseOption {
   id: number;
+  readOnly: boolean;
   comment: string;
+  description: string;
   category: OptionCategory;
   type: WriteType;
   value: string;
   address: string | null;
   gameInit: boolean;
+  statEdit: boolean;
   rawJson: boolean;
   additionalWrites: WriteEntry[];
 }
@@ -54,15 +60,18 @@ export interface PresetOption {
   gameInitWrites: WriteEntry[];
   appendedWrites: WriteEntry[];
   previewJson: JsonObject | null;
+  source: DatabaseOption;
 }
 
 export interface CreateOptionInput {
   comment: string;
+  description?: string;
   category: OptionCategory;
   type: WriteType;
   value: string;
   address?: string;
   gameInit?: boolean;
+  statEdit?: boolean;
   rawJson?: boolean;
   additionalWrites?: WriteEntry[];
 }
@@ -73,6 +82,7 @@ export interface PresetAppApi {
   getPresetTemplate: () => Promise<unknown>;
   listOptions: () => Promise<unknown>;
   createOption: (request: CreateOptionInput) => Promise<unknown>;
+  updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
   exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string }) => Promise<unknown>;
   windowControls: {

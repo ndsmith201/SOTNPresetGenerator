@@ -4,7 +4,7 @@ Reference checked on 2026-09-06 against the [Locations guide](https://www.sympho
 
 These are full check lists, including inherited locations, not just each extension's additions. They describe locations to check, not which relic can be placed there or how to access them. Preset-specific fixed placements and exclusions may still apply.
 
-The reusable export is `RELIC_LOCATION_CHECKS` in `src/renderer/relic-location-checks.ts`, keyed by the app's six `MetaExtension` values. Preview and export filter the template's checks by the selected extension, then apply starting-relic lock adjustments. Each rebuild starts from the original template. Raw JSON lock overrides are filtered too; they cannot change the selected extension. Complexity still uses the template locks through Trio.
+The reusable export is `RELIC_LOCATION_CHECKS` in `src/renderer/relic-location-checks.ts`, keyed by the app's six `MetaExtension` values. Preview and export filter the template's checks by the selected extension, then apply starting-relic lock adjustments. Each rebuild starts from the original template. Raw JSON lock overrides are filtered too; they cannot change the selected extension. Complexity uses all checks in the selected extension, including allowed checks after Trio, and recalculates when the extension changes.
 
 ## Composition
 

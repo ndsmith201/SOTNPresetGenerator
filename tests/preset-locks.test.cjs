@@ -20,6 +20,42 @@ function preview(template, options, ids = options.map((option) => option.id)) {
   return buildPreviewPreset(template, { ...preset, optionIds: ids }, options);
 }
 
+test("stat-edit options keep their UI category and follow all relic writes in the JSON", () => {
+  const [statEdit, regular] = toPresetOptions([
+    { id: 901, comment: "Raise strength", category: "gameplay", type: "word", value: "0x00000001", address: "0x00123456", gameInit: false, statEdit: true, rawJson: false, additionalWrites: [] },
+    { id: 902, comment: "Regular patch", category: "gameplay", type: "word", value: "0x00000002", address: "0x00123458", gameInit: false, statEdit: false, rawJson: false, additionalWrites: [] }
+  ]);
+  const template = { writes: [
+    { comment: "Before", type: "word", value: "0x00000000" },
+    { comment: "lui v1, 0x8004", type: "word", value: "0x3c038004" },
+    { comment: "After", type: "word", value: "0x00000000" }
+  ] };
+  const relic = option("relic", "Enable Soul of Bat", {
+    injectedWrites: [{ comment: "First relic" }, { comment: "Relic follow-up" }]
+  });
+  const otherRelic = option("other-relic", "Enable Leap Stone", {
+    injectedWrites: [{ comment: "Second relic" }]
+  });
+  const otherStatEdit = structuredClone(statEdit);
+  otherStatEdit.id = "other-stat-edit";
+  otherStatEdit.injectedWrites = [{ comment: "Raise defense" }, { comment: "Stat follow-up" }];
+  const options = [statEdit, relic, otherStatEdit, regular, otherRelic];
+  const originalOptions = structuredClone(options);
+  const result = preview(template, options);
+
+  assert.equal(statEdit.category, "gameplay");
+  assert.deepEqual(result.writes.map((write) => write.comment), [
+    "Before", "First relic", "Relic follow-up", "Second relic", "Raise strength",
+    "Raise defense", "Stat follow-up", "lui v1, 0x8004", "After", "Regular patch"
+  ]);
+  assert.deepEqual(options, originalOptions);
+  const fallback = preview({ writes: [{ comment: "j 0x800e493c" }] }, options);
+  assert.deepEqual(fallback.writes.map((write) => write.comment), [
+    "First relic", "Relic follow-up", "Second relic", "Raise strength", "Raise defense",
+    "Stat follow-up", "j 0x800e493c", "Regular patch"
+  ]);
+});
+
 test("removes all selected relics from every combination using exact names", () => {
   const options = [option("bat", "Enable Soul of Bat"), option("leap", "Enable Leap Stone")];
   const result = preview({ lockLocation: [
@@ -87,7 +123,7 @@ test("all enabled relics from the SQL dump are removed across the real template"
     database.close();
   }
   const options = toPresetOptions(rows.map((row) => ({ ...row,
-    gameInit: Boolean(row.game_init), rawJson: Boolean(row.raw_json),
+    gameInit: Boolean(row.game_init), statEdit: Boolean(row.stat_edit), rawJson: Boolean(row.raw_json),
     additionalWrites: JSON.parse(row.additional_writes_json || "[]")
   })));
   const template = JSON.parse(readFileSync(path.join(__dirname, "../templates/preset-template.json"), "utf8"));

@@ -57,7 +57,11 @@ function getEnabledRelics(selected: PresetOption[]): Set<string> {
 /** Longest sequence of check-opening pickups, plus final Vlad completion.
  * Relic placement is unknown: setup pickups are allowed, but score zero.
  */
-export function calculateMaxComplexity(template: JsonObject | null, selected: PresetOption[] = []): number {
+export function calculateMaxComplexity(
+  template: JsonObject | null,
+  selected: PresetOption[] = [],
+  extension: MetaExtension = DEFAULT_META_EXTENSION
+): number {
   let locations = template?.lockLocation;
   let complexityGoal = template?.complexityGoal;
   for (const option of selected) {
@@ -65,14 +69,14 @@ export function calculateMaxComplexity(template: JsonObject | null, selected: Pr
     if (option.previewJson && Object.hasOwn(option.previewJson, "complexityGoal")) complexityGoal = option.previewJson.complexityGoal;
   }
   if (!Array.isArray(locations)) return 0;
+  const allowedLocations = new Set(RELIC_LOCATION_CHECKS[normalizeMetaExtension(extension)]);
   const routes: string[][][] = [];
   for (const location of locations) {
-    if (!isJsonObject(location)) continue;
+    if (!isJsonObject(location) || typeof location.location !== "string" || !allowedLocations.has(location.location)) continue;
     if (Array.isArray(location.locks)) {
       routes.push(location.locks.filter((lock): lock is string => typeof lock === "string")
         .map((lock) => lock.split("+").map((relic) => relic.trim()).filter(Boolean)));
     }
-    if (location.location === "Trio") break;
   }
   const enabled = getEnabledRelics(selected);
   const goals = isJsonObject(complexityGoal) && Array.isArray(complexityGoal.goals)
@@ -90,7 +94,7 @@ export function calculateMaxComplexity(template: JsonObject | null, selected: Pr
   const flightMasks = usesMovement ? FLIGHT_METHODS.map(mask) : [];
   const jumpMask = mask(["Leap Stone", "Gravity Boots"]);
   const methods = FLIGHT_SATISFIED_REQUIREMENTS.map((names) => ({ names, mask: mask(names) }));
-  const checks = routes.map((alternatives) => {
+  const checkRoutes = routes.map((alternatives) => {
     // If every route needs Mist and some use another movement method, Mist
     // serves as entry as well as flight (for example, Soul of Bat's location).
     const mistEntry = alternatives.length > 0 && alternatives.every((route) => route.includes("Form of Mist")) &&
@@ -107,6 +111,12 @@ export function calculateMaxComplexity(template: JsonObject | null, selected: Pr
       return { required, withFlight };
     });
   });
+  // Identical access rules always open together and score just one step.
+  // Collapse them so larger extensions do not repeat the same inventory checks.
+  const checks = [...new Map(checkRoutes.map((alternatives) => [
+    [...new Set(alternatives.map(({ required, withFlight }) => `${required}:${withFlight}`))].sort().join("|"),
+    alternatives
+  ])).values()];
   const allChecks = (1n << BigInt(checks.length)) - 1n;
   const allRelics = mask(relics);
   const start = mask([...enabled]);
@@ -200,12 +210,15 @@ export function isDatabaseOption(value: unknown): value is DatabaseOption {
     typeof value.id === "number" &&
     Number.isSafeInteger(value.id) &&
     typeof value.comment === "string" &&
+    typeof value.description === "string" &&
+    typeof value.readOnly === "boolean" &&
     OPTION_GROUPS.some((group) => group.id === value.category) &&
     typeof value.type === "string" &&
     WRITE_TYPES.includes(value.type as DatabaseOption["type"]) &&
     typeof value.value === "string" &&
     (value.address === null || typeof value.address === "string") &&
     typeof value.gameInit === "boolean" &&
+    typeof value.statEdit === "boolean" &&
     typeof value.rawJson === "boolean" &&
     Array.isArray(value.additionalWrites) &&
     value.additionalWrites.every(isJsonObject)
@@ -226,19 +239,18 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
     const primaryWrite: WriteEntry = { comment: option.comment, type: option.type, value: option.value };
     if (option.address) primaryWrite.address = option.address;
     const writes = option.rawJson ? [] : [primaryWrite, ...option.additionalWrites.map((write) => structuredClone(write))];
-    const location = option.address ? option.address : "startup code";
-    const extraCount = option.additionalWrites.length;
-    const injectRelicWrites = !option.rawJson && !option.gameInit && option.category === "relics" && !option.address;
-    const locationDescription = option.rawJson ? "preview JSON" : option.gameInit ? "game init" : location;
+    const injectRelicWrites = !option.rawJson && !option.gameInit &&
+      (option.statEdit || (option.category === "relics" && !option.address));
     return {
       id: `option:${option.id}`,
       label: option.comment,
-      description: `${option.type} · ${option.value} · ${locationDescription}${extraCount ? ` · +${extraCount} write${extraCount === 1 ? "" : "s"}` : ""}`,
+      description: option.description ?? "",
       category: option.category,
       injectedWrites: injectRelicWrites ? writes : [],
       gameInitWrites: option.gameInit ? writes : [],
       appendedWrites: injectRelicWrites || option.gameInit || option.rawJson ? [] : writes,
-      previewJson
+      previewJson,
+      source: structuredClone(option)
     };
   });
 }
@@ -359,7 +371,7 @@ export function buildPreviewPreset(
   const preview = structuredClone(template);
   const extension = normalizeMetaExtension(preset.metaExtension);
   const selected = options.filter((option) => preset.optionIds.includes(option.id));
-  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculateMaxComplexity(template, selected));
+  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculateMaxComplexity(template, selected, extension));
   const earlyTransformEnabled = selected.some((option) => EARLY_TRANSFORM_OPTION_LABELS.has(option.label));
   const metadata = isJsonObject(preview.metadata) ? preview.metadata : {};
   metadata.id = presetIdFromName(preset.name);
@@ -381,7 +393,12 @@ export function buildPreviewPreset(
   const templateWrites = Array.isArray(preview.writes)
     ? preview.writes.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
-  const injected = selected.flatMap((option) => structuredClone(option.injectedWrites));
+  // Keep each option's writes together, with all stat edits following the relics.
+  const injectionOrder = [
+    ...selected.filter((option) => !option.source?.statEdit),
+    ...selected.filter((option) => option.source?.statEdit)
+  ];
+  const injected = injectionOrder.flatMap((option) => structuredClone(option.injectedWrites));
   const gameInit = selected.flatMap((option) => structuredClone(option.gameInitWrites));
   const appended = selected.flatMap((option) => structuredClone(option.appendedWrites));
   const gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);

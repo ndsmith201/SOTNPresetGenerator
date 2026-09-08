@@ -18,7 +18,7 @@ import { Toast } from "./components/Toast";
 import { TopBar } from "./components/TopBar";
 import { WindowBar } from "./components/WindowBar";
 import { buildPreviewPreset, calculateMaxComplexity, isDatabaseOption, isJsonObject, loadPresets, normalizeComplexity, persistPresets, toPresetOptions } from "./preset-utils";
-import type { CreateOptionInput, JsonObject, Preset, PresetOption } from "./types";
+import type { CreateOptionInput, DatabaseOption, JsonObject, Preset, PresetOption } from "./types";
 
 async function fetchOptions(): Promise<PresetOption[]> {
   const response = await window.presetApp.listOptions();
@@ -36,6 +36,7 @@ export function App() {
   const [initialized, setInitialized] = useState(false);
   const [createPresetOpen, setCreatePresetOpen] = useState(false);
   const [createOptionOpen, setCreateOptionOpen] = useState(false);
+  const [editingOption, setEditingOption] = useState<DatabaseOption | null>(null);
   const [authorSettingsOpen, setAuthorSettingsOpen] = useState(false);
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
   const [author, setAuthor] = useState(() => localStorage.getItem(PRESET_AUTHOR_KEY) ?? "");
@@ -90,8 +91,9 @@ export function App() {
   const activePreset = useMemo(() => presets.find((preset) => preset.id === activePresetId) ?? null, [activePresetId, presets]);
   const optionLabels = useMemo(() => new Map(options.map((option) => [option.id, option.label])), [options]);
   const activeOptionIds = activePreset?.optionIds;
+  const activeExtension = activePreset?.metaExtension ?? DEFAULT_META_EXTENSION;
   const maximumComplexity = useMemo(() => calculateMaxComplexity(template,
-    options.filter((option) => activeOptionIds?.includes(option.id))), [template, options, activeOptionIds]);
+    options.filter((option) => activeOptionIds?.includes(option.id)), activeExtension), [template, options, activeOptionIds, activeExtension]);
   const preview = useMemo(() => buildPreviewPreset(template, activePreset, options, author, maximumComplexity), [activePreset, options, template, author, maximumComplexity]);
   const boundedComplexity = normalizeComplexity(activePreset?.complexity, maximumComplexity);
 
@@ -154,14 +156,23 @@ export function App() {
     finally { setExporting(false); }
   };
 
-  const createOption = async (input: CreateOptionInput) => {
-    const result = await window.presetApp.createOption(input);
+  const saveOption = async (input: CreateOptionInput) => {
+    const result = editingOption
+      ? await window.presetApp.updateOption(editingOption.id, input)
+      : await window.presetApp.createOption(input);
     if (!isJsonObject(result)) throw new Error("Invalid response from the options database.");
     if (result.status === "error" && typeof result.error === "string") throw new Error(result.error);
-    if (result.status !== "created" || !isDatabaseOption(result.option)) throw new Error("The option could not be created.");
+    const expectedStatus = editingOption ? "updated" : "created";
+    if (result.status !== expectedStatus || !isDatabaseOption(result.option)) throw new Error(`The option could not be ${editingOption ? "updated" : "created"}.`);
     setOptions(await fetchOptions());
     setCreateOptionOpen(false);
-    showToast("Option added");
+    setEditingOption(null);
+    showToast(editingOption ? "Option updated" : "Option added");
+  };
+
+  const closeOptionDialog = () => {
+    setCreateOptionOpen(false);
+    setEditingOption(null);
   };
 
   const copyPreview = async () => {
@@ -187,10 +198,10 @@ export function App() {
       <div className="app-shell">
         <WindowBar editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={() => setActivePresetId(null)} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
         <TopBar editing={Boolean(activePreset)} presetCount={presets.length} exporting={exporting} onNewPreset={() => setCreatePresetOpen(true)} onBack={() => setActivePresetId(null)} onExport={() => void exportPreset()} onSave={() => showToast("Preset saved locally")} />
-        {activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => setCreateOptionOpen(true)} onCopy={() => void copyPreview()} /> : <PresetLibrary presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} />}
+        {activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onCopy={() => void copyPreview()} /> : <PresetLibrary presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} onClose={() => setCreatePresetOpen(false)} onSubmit={createPreset} />
-      <CreateOptionDialog open={createOptionOpen} onClose={() => setCreateOptionOpen(false)} onSubmit={createOption} />
+      <CreateOptionDialog open={createOptionOpen} option={editingOption} onClose={closeOptionDialog} onSubmit={saveOption} />
       <AuthorSettingsDialog open={authorSettingsOpen} author={author} onClose={() => setAuthorSettingsOpen(false)} onSave={saveAuthor} />
       <DeletePresetDialog preset={presetToDelete} onClose={() => setPresetToDelete(null)} onDelete={deletePreset} />
       <Toast message={toast} />

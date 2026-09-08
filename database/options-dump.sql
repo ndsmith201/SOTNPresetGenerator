@@ -4,6 +4,8 @@ BEGIN TRANSACTION;
 CREATE TABLE options (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   comment TEXT NOT NULL CHECK (length(trim(comment)) > 0),
+  description TEXT NOT NULL DEFAULT '',
+  read_only INTEGER NOT NULL DEFAULT 0 CHECK (read_only IN (0, 1)),
   category TEXT NOT NULL CHECK (category IN ('world', 'items', 'challenge', 'relics', 'gameplay')),
   type TEXT NOT NULL CHECK (type IN ('char', 'short', 'word', 'long', 'string')),
   value TEXT NOT NULL CHECK (length(trim(value)) > 0),
@@ -15,6 +17,7 @@ CREATE TABLE options (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
+  stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
   raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1))
 );
 
@@ -96,6 +99,7 @@ VALUES
   }]}', NULL, NULL, '2026-09-04 21:41:46', '2026-09-04 21:41:46', 0, 1);
 
 DELETE FROM sqlite_sequence;
+UPDATE options SET read_only = 1;
 INSERT INTO sqlite_sequence (name, seq) VALUES ('options', 43);
 
 CREATE INDEX options_category_type_idx
