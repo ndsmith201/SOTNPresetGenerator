@@ -5,8 +5,9 @@ export function ComplexityControl({ value, maximum, onChange }: { value: number;
   const minimum = Math.min(MIN_COMPLEXITY, maximum);
   return (
     <section className="complexity-control" aria-labelledby="complexityLabel">
-      <div className="complexity-heading"><div><strong id="complexityLabel">Complexity target</strong><span id="complexityHelp">{maximum === 0 ? "Starting relics already open every check through Trio." : `Maximum ${maximum}, based on starting relics and checks through Trio.`}</span></div><output>{value}</output></div>
-      <input type="range" min={minimum} max={maximum} step="1" value={value} disabled={maximum === minimum} aria-labelledby="complexityLabel" aria-describedby="complexityHelp" onChange={(event) => onChange(Number(event.target.value))} />
+      <div className="complexity-heading"><div><strong id="complexityLabel">Complexity target</strong><span id="complexityHelp">{maximum === 0 ? "No progression remains for this extension and starting relics." : `Maximum ${maximum}, based on starting relics and the selected extension.`}</span></div><output>{value}</output></div>
+      {/* Recreate the range when its bounds change so browser clamping cannot leave React's value tracker stale. */}
+      <input key={maximum} type="range" min={minimum} max={maximum} step="1" value={value} disabled={maximum === minimum} aria-labelledby="complexityLabel" aria-describedby="complexityHelp" onChange={(event) => onChange(Number(event.target.value))} />
       <div className="complexity-scale" aria-hidden="true"><span>{minimum}</span><span>{maximum}</span></div>
     </section>
   );

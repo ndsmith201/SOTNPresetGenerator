@@ -7,11 +7,25 @@ export interface PresetAppApi {
   listOptions: () => Promise<unknown>;
   createOption: (request: {
     comment: string;
+    description?: string;
     category: string;
     type: string;
     value: string;
     address?: string;
     gameInit?: boolean;
+    statEdit?: boolean;
+    rawJson?: boolean;
+    additionalWrites?: Record<string, unknown>[];
+  }) => Promise<unknown>;
+  updateOption: (id: number, request: {
+    comment: string;
+    description?: string;
+    category: string;
+    type: string;
+    value: string;
+    address?: string;
+    gameInit?: boolean;
+    statEdit?: boolean;
     rawJson?: boolean;
     additionalWrites?: Record<string, unknown>[];
   }) => Promise<unknown>;
@@ -30,6 +44,7 @@ const api: PresetAppApi = {
   getPresetTemplate: () => ipcRenderer.invoke("preset:get-template") as Promise<unknown>,
   listOptions: () => ipcRenderer.invoke("options:list") as Promise<unknown>,
   createOption: (request) => ipcRenderer.invoke("options:create", request) as Promise<unknown>,
+  updateOption: (id, request) => ipcRenderer.invoke("options:update", id, request) as Promise<unknown>,
   chooseSotnRandoPath: (currentPath) => ipcRenderer.invoke("sotnrando:choose-path", currentPath) as Promise<unknown>,
   exportPreset: (request) => ipcRenderer.invoke("preset:export", request) as Promise<unknown>,
   windowControls: {

@@ -31,18 +31,21 @@ export const BUILT_IN_TOGGLES: readonly {
   label: string;
   defaultValue: boolean;
 }[] = [
+  { key: "tournamentMode", label: "Tournament mode", defaultValue: true },
+  { key: "zeroDollarRelicMode", label: "Zero-dollar relics", defaultValue: true },
+  { key: "openClockStatueMode", label: "Open Clock Statue", defaultValue: true },
   { key: "colorrandoMode", label: "Color randomizer", defaultValue: true },
   { key: "stats", label: "Randomize stats", defaultValue: false },
   { key: "turkeyMode", label: "Turkey mode", defaultValue: true },
   { key: "music", label: "Randomize music", defaultValue: false },
   { key: "fastwarpMode", label: "Fast warps", defaultValue: true },
-  { key: "magicmaxMode", label: "Max magic", defaultValue: false },
-  { key: "surpriseMode", label: "Surprise mode", defaultValue: true },
+  { key: "magicmaxMode", label: "Max magic", defaultValue: true },
+  { key: "surpriseMode", label: "Surprise mode", defaultValue: false },
   { key: "antiFreezeMode", label: "Anti-freeze", defaultValue: true },
   { key: "noprologueMode", label: "Skip prologue", defaultValue: true },
-  { key: "enemyStatRandoMode", label: "Enemy stats", defaultValue: true },
-  { key: "shopPriceRandoMode", label: "Shop prices", defaultValue: true },
-  { key: "startRoomRandoMode", label: "Starting room", defaultValue: true },
+  { key: "enemyStatRandoMode", label: "Enemy stats", defaultValue: false },
+  { key: "shopPriceRandoMode", label: "Shop prices", defaultValue: false },
+  { key: "startRoomRandoMode", label: "Starting room", defaultValue: false },
   { key: "startRoomRando2ndMode", label: "2nd Castle Starting room", defaultValue: false },
   { key: "rlbcMode", label: "RLBC mode", defaultValue: true }
 ];

@@ -31,8 +31,8 @@ WITH seed_options(comment, category, type, value) AS (
     ('Enable Ring of Vlad', 'relics', 'word', '0xa0627980'),
     ('Enable Eye of Vlad', 'relics', 'word', '0xa0627981')
 )
-INSERT INTO options (comment, category, type, value)
-SELECT seed.comment, seed.category, seed.type, seed.value
+INSERT INTO options (comment, category, type, value, read_only)
+SELECT seed.comment, seed.category, seed.type, seed.value, 1
 FROM seed_options AS seed
 WHERE NOT EXISTS (
   SELECT 1

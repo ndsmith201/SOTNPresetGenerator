@@ -13,7 +13,7 @@ let options;
 try {
   database.exec(readFileSync(path.join(__dirname, "../database/options-dump.sql"), "utf8"));
   options = toPresetOptions(database.prepare("SELECT * FROM options").all().map((row) => ({
-    ...row, gameInit: Boolean(row.game_init), rawJson: Boolean(row.raw_json),
+    ...row, gameInit: Boolean(row.game_init), statEdit: Boolean(row.stat_edit), rawJson: Boolean(row.raw_json),
     additionalWrites: JSON.parse(row.additional_writes_json || "[]")
   })));
 } finally {
