@@ -5,6 +5,8 @@ import { Icon } from "./Icon";
 import { OptionGroups } from "./OptionGroups";
 import { ComplexityControl, MetaExtensionControl } from "./PresetControls";
 import { PresetNameInput } from "./PresetNameInput";
+import { detectStartingRelics } from "../starting-relics";
+import { templateWithOptionSelections } from "../template-options";
 
 interface OptionsPaneProps {
   preset: Preset;
@@ -19,6 +21,7 @@ export function OptionsPane({ preset, options, maximumComplexity, onChange, onNe
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OptionFilter>("all");
   const selected = useMemo(() => new Set(preset.optionIds), [preset.optionIds]);
+  const startingRelics = useMemo(() => [...detectStartingRelics(templateWithOptionSelections(preset) ?? null)], [preset.baseTemplate, preset.templateOptionMatches, preset.optionIds]);
   const groups = useMemo(() => {
     const result = new Map<OptionCategory, PresetOption[]>();
     options.forEach((option) => {
@@ -44,6 +47,7 @@ export function OptionsPane({ preset, options, maximumComplexity, onChange, onNe
       </div>
       <ComplexityControl value={preset.complexity} maximum={maximumComplexity} onChange={(complexity) => onChange({ complexity })} />
       <MetaExtensionControl value={preset.metaExtension} onChange={(metaExtension) => onChange({ metaExtension })} />
+      {startingRelics.length > 0 && <p className="template-starting-relics">Template starting relics: {startingRelics.join(", ")}. Included in location locks and complexity.</p>}
       <BuiltInSettings value={preset.builtInSettings} onChange={(builtInSettings) => onChange({ builtInSettings })} />
       <div className="option-toolbar">
         <div className="filter-tabs" role="tablist" aria-label="Option filters">

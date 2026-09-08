@@ -19,6 +19,8 @@ import type {
   WriteEntry
 } from "./types";
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
+import { detectStartingRelics } from "./starting-relics";
+import { selectTemplateOptions, templateWithOptionSelections } from "./template-options";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -48,10 +50,10 @@ export function normalizeComplexity(value: unknown, maximum = Number.MAX_SAFE_IN
   return Math.min(maximum, Math.max(Math.min(MIN_COMPLEXITY, maximum), candidate));
 }
 
-function getEnabledRelics(selected: PresetOption[]): Set<string> {
-  return new Set(selected
+function getEnabledRelics(selected: PresetOption[], template: JsonObject | null = null): Set<string> {
+  return new Set([...detectStartingRelics(template), ...selected
     .filter((option) => option.category === "relics" && option.label.startsWith("Enable "))
-    .map((option) => option.label.slice("Enable ".length).trim()));
+    .map((option) => option.label.slice("Enable ".length).trim())]);
 }
 
 /** Longest sequence of check-opening pickups, plus final Vlad completion.
@@ -78,7 +80,7 @@ export function calculateMaxComplexity(
         .map((lock) => lock.split("+").map((relic) => relic.trim()).filter(Boolean)));
     }
   }
-  const enabled = getEnabledRelics(selected);
+  const enabled = getEnabledRelics(selected, template);
   const goals = isJsonObject(complexityGoal) && Array.isArray(complexityGoal.goals)
     ? complexityGoal.goals.filter((goal): goal is string => typeof goal === "string") : [];
   // The last required Vlad completes the goal rather than opening a check.
@@ -169,6 +171,48 @@ export function normalizeBuiltInSettings(value: unknown): BuiltInSettings {
   return settings;
 }
 
+export function templateExtension(template: JsonObject): MetaExtension {
+  if (template.relicLocationsExtension === false) return "Classic";
+  const metadata = isJsonObject(template.metadata) ? template.metadata : {};
+  const value = template.relicLocationsExtension ?? metadata.metaExtension;
+  return META_EXTENSIONS.find((extension) => extension.toLowerCase() === String(value).toLowerCase()) ?? DEFAULT_META_EXTENSION;
+}
+
+function templateComplexity(template: JsonObject): number {
+  const goal = isJsonObject(template.complexityGoal) ? template.complexityGoal : {};
+  const metadata = isJsonObject(template.metadata) ? template.metadata : {};
+  const value = goal.min ?? Number(metadata.metaComplexity);
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : DEFAULT_COMPLEXITY;
+}
+
+export function createPresetFromTemplate(name: string, source?: JsonObject, options: PresetOption[] = []): Preset {
+  const timestamp = new Date().toISOString();
+  return selectTemplateOptions({
+    id: crypto.randomUUID(), name, optionIds: [],
+    complexity: source ? templateComplexity(source) : DEFAULT_COMPLEXITY,
+    metaExtension: source ? templateExtension(source) : DEFAULT_META_EXTENSION,
+    builtInSettings: normalizeBuiltInSettings(source),
+    createdAt: timestamp, updatedAt: timestamp,
+    ...(source ? { baseTemplate: structuredClone(source) } : {})
+  }, options);
+}
+
+export function calculatePresetMaxComplexity(template: JsonObject | null, preset: Preset | null, options: PresetOption[]): number {
+  if (!preset) return 0;
+  const source = presetTemplate(template, preset);
+  const selected = options.filter((option) => preset.optionIds.includes(option.id));
+  return calculateMaxComplexity(source, selected, preset.metaExtension);
+}
+
+function presetTemplate(template: JsonObject | null, preset: Preset): JsonObject | null {
+  if (!template) return null;
+  if (!preset.baseTemplate) return template;
+  // Keep installed settings, but use the bundled access rules for every
+  // extension. Preview generation clones and filters these before editing them.
+  const { inherits: _inherits, ...source } = templateWithOptionSelections(preset)!;
+  return { ...source, lockLocation: template.lockLocation ?? [] };
+}
+
 function isPreset(value: unknown): value is Preset {
   if (!isJsonObject(value)) return false;
   return (
@@ -179,6 +223,10 @@ function isPreset(value: unknown): value is Preset {
     (value.complexity === undefined || typeof value.complexity === "number") &&
     (value.metaExtension === undefined || typeof value.metaExtension === "string") &&
     (value.builtInSettings === undefined || isJsonObject(value.builtInSettings)) &&
+    (value.baseTemplate === undefined || isJsonObject(value.baseTemplate)) &&
+    (value.templateOptionMatches === undefined || (Array.isArray(value.templateOptionMatches) && value.templateOptionMatches.every((match) =>
+      isJsonObject(match) && typeof match.optionId === "string" && Array.isArray(match.writeIndices) && match.writeIndices.every((index) => Number.isSafeInteger(index) && index >= 0) &&
+      Array.isArray(match.jsonKeys) && match.jsonKeys.every((key) => typeof key === "string")))) &&
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string"
   );
@@ -280,8 +328,7 @@ function isGameInitAnchor(write: WriteEntry): boolean {
   );
 }
 
-function removeEnabledRelicsFromLocks(preview: JsonObject, selected: PresetOption[]): void {
-  const enabledRelics = getEnabledRelics(selected);
+function removeEnabledRelicsFromLocks(preview: JsonObject, enabledRelics: Set<string>): void {
   if (!enabledRelics.size || !Array.isArray(preview.lockLocation)) return;
   const enabledFlightMethods = FLIGHT_METHODS.filter((method) => method.every((relic) => enabledRelics.has(relic)));
   const hasFlight = enabledFlightMethods.length > 0;
@@ -367,27 +414,45 @@ export function buildPreviewPreset(
   author?: string,
   maximumComplexity?: number
 ): JsonObject | null {
-  if (!template || !preset) return null;
-  const preview = structuredClone(template);
+  if (!preset) return null;
+  const source = presetTemplate(template, preset);
+  if (!source) return null;
+  const preview = structuredClone(source);
   const extension = normalizeMetaExtension(preset.metaExtension);
   const selected = options.filter((option) => preset.optionIds.includes(option.id));
-  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculateMaxComplexity(template, selected, extension));
-  const earlyTransformEnabled = selected.some((option) => EARLY_TRANSFORM_OPTION_LABELS.has(option.label));
+  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculatePresetMaxComplexity(template, preset, options));
+  const matchedIds = new Set(preset.templateOptionMatches?.map((match) => match.optionId));
+  const additions = selected.filter((option) => !matchedIds.has(option.id));
+  const extensionChanged = !preset.baseTemplate || extension !== templateExtension(source);
+  const enabledRelics = getEnabledRelics(selected, source);
+  const earlyTransformEnabled = [...EARLY_TRANSFORM_OPTION_LABELS].some((label) => enabledRelics.has(label.slice("Enable ".length)));
+  const originalRelics = detectStartingRelics(preset.baseTemplate ?? null);
+  const removedEarlyTransform = [...EARLY_TRANSFORM_OPTION_LABELS].some((label) => originalRelics.has(label.slice("Enable ".length)) && !enabledRelics.has(label.slice("Enable ".length)));
   const metadata = isJsonObject(preview.metadata) ? preview.metadata : {};
   metadata.id = presetIdFromName(preset.name);
   metadata.name = preset.name;
   metadata.metaComplexity = complexity.toString();
-  metadata.metaExtension = extension;
-  metadata.transformEarly = earlyTransformEnabled;
-  metadata.transformFocus = earlyTransformEnabled;
+  if (extensionChanged || !Object.hasOwn(metadata, "metaExtension")) metadata.metaExtension = extension;
+  if (!preset.baseTemplate || earlyTransformEnabled || removedEarlyTransform) {
+    metadata.transformEarly = earlyTransformEnabled;
+    metadata.transformFocus = earlyTransformEnabled;
+  }
   preview.metadata = metadata;
-  preview.relicLocationsExtension = extension === "Classic" ? false : extension.toLowerCase();
+  if (extensionChanged || !Object.hasOwn(source, "relicLocationsExtension")) {
+    preview.relicLocationsExtension = extension === "Classic" ? false : extension.toLowerCase();
+  }
 
   const complexityGoal = isJsonObject(preview.complexityGoal) ? preview.complexityGoal : {};
   complexityGoal.min = complexity;
   preview.complexityGoal = complexityGoal;
   BUILT_IN_TOGGLES.forEach(({ key }) => {
-    preview[key] = preset.builtInSettings[key];
+    // Some randomizer settings also accept structured values. Keep those until
+    // the user changes that toggle, and fill absent settings with app defaults.
+    if (!Object.hasOwn(source, key) || typeof source[key] === "boolean" ||
+      preset.builtInSettings[key] !== DEFAULT_BUILT_IN_SETTINGS[key]) {
+      const removed = preset.templateOptionMatches?.some((match) => !preset.optionIds.includes(match.optionId) && match.jsonKeys.includes(key)) && !Object.hasOwn(source, key);
+      preview[key] = removed ? DEFAULT_BUILT_IN_SETTINGS[key] : preset.builtInSettings[key];
+    }
   });
 
   const templateWrites = Array.isArray(preview.writes)
@@ -395,12 +460,12 @@ export function buildPreviewPreset(
     : [];
   // Keep each option's writes together, with all stat edits following the relics.
   const injectionOrder = [
-    ...selected.filter((option) => !option.source?.statEdit),
-    ...selected.filter((option) => option.source?.statEdit)
+    ...additions.filter((option) => !option.source?.statEdit),
+    ...additions.filter((option) => option.source?.statEdit)
   ];
   const injected = injectionOrder.flatMap((option) => structuredClone(option.injectedWrites));
-  const gameInit = selected.flatMap((option) => structuredClone(option.gameInitWrites));
-  const appended = selected.flatMap((option) => structuredClone(option.appendedWrites));
+  const gameInit = additions.flatMap((option) => structuredClone(option.gameInitWrites));
+  const appended = additions.flatMap((option) => structuredClone(option.appendedWrites));
   const gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);
   if (gameInitAnchorIndex >= 0) {
     templateWrites.splice(gameInitAnchorIndex, 0, ...injected);
@@ -412,7 +477,7 @@ export function buildPreviewPreset(
   }
   templateWrites.push(...appended);
   preview.writes = templateWrites;
-  const merged = selected.reduce(
+  const merged = additions.reduce(
     (merged, option) => option.previewJson ? { ...merged, ...structuredClone(option.previewJson) } : merged,
     preview
   );
@@ -420,20 +485,21 @@ export function buildPreviewPreset(
   mergedMetadata.id = presetIdFromName(preset.name);
   mergedMetadata.name = preset.name;
   mergedMetadata.metaComplexity = complexity.toString();
-  mergedMetadata.metaExtension = extension;
+  if (extensionChanged || !Object.hasOwn(mergedMetadata, "metaExtension")) mergedMetadata.metaExtension = extension;
   if (author?.trim()) mergedMetadata.author = [author.trim()];
   merged.metadata = mergedMetadata;
   merged.complexityGoal = { ...(isJsonObject(merged.complexityGoal) ? merged.complexityGoal : {}), min: complexity };
+  if (preset.baseTemplate) delete merged.inherits;
   // Enforce the selected extension after raw options, so they cannot reintroduce
   // excluded checks or change the extension behind the selector's back.
-  merged.relicLocationsExtension = preview.relicLocationsExtension;
+  if (Object.hasOwn(preview, "relicLocationsExtension")) merged.relicLocationsExtension = preview.relicLocationsExtension;
   if (Array.isArray(merged.lockLocation)) {
     const allowedLocations = new Set(RELIC_LOCATION_CHECKS[extension]);
     merged.lockLocation = merged.lockLocation.filter((entry) =>
       isJsonObject(entry) && typeof entry.location === "string" && allowedLocations.has(entry.location)
     );
   }
-  removeEnabledRelicsFromLocks(merged, selected);
+  removeEnabledRelicsFromLocks(merged, enabledRelics);
   return merged;
 }
 

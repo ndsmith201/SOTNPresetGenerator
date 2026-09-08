@@ -1,28 +1,58 @@
 {
   "name": "sotn-preset-generator",
   "version": "0.1.0",
+  "productName": "SOTN Preset Generator",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ndsmith201/SOTNPresetGenerator.git"
+  },
   "description": "A desktop UI for assembling Symphony of the Night presets.",
   "main": "dist/main.js",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "tsc && node scripts/build-renderer.mjs",
-    "start": "npm run build && electron .",
-    "dev": "npm run build && electron .",
+    "build": "node scripts/build.mjs",
+    "start": "electron-forge start",
+    "dev": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "options:dump": "node scripts/export-options.cjs",
+    "options:check": "node scripts/export-options.cjs --check",
+    "version": "npm run options:dump && git add database/options-dump.sql",
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test tests/*.test.cjs"
   },
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "overrides": {
+    "tar": "7.5.22",
+    "tmp": "0.2.7",
+    "extract-zip": "npm:@electron-internal/extract-zip@1.0.5"
+  },
   "dependencies": {
+    "electron-squirrel-startup": "1.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@electron-forge/cli": "7.11.2",
+    "@electron-forge/maker-squirrel": "7.11.2",
+    "@electron-forge/maker-zip": "7.11.2",
+    "@electron-forge/publisher-github": "7.11.2",
+    "@types/electron-squirrel-startup": "1.0.2",
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
-    "esbuild": "^0.25.9",
     "electron": "^44.1.1",
+    "esbuild": "^0.25.9",
     "typescript": "^5.9.2"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "electron-winstaller@5.4.4": true
   }
 }

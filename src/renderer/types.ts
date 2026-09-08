@@ -34,6 +34,20 @@ export interface Preset {
   builtInSettings: BuiltInSettings;
   createdAt: string;
   updatedAt: string;
+  baseTemplate?: JsonObject;
+  templateOptionMatches?: TemplateOptionMatch[];
+}
+
+export interface TemplateOptionMatch {
+  optionId: string;
+  writeIndices: number[];
+  jsonKeys: string[];
+}
+
+export interface InstalledPreset {
+  fileName: string;
+  name: string;
+  json: JsonObject;
 }
 
 export interface DatabaseOption {
@@ -80,6 +94,7 @@ export interface PresetAppApi {
   platform: string;
   version: string;
   getPresetTemplate: () => Promise<unknown>;
+  listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
   createOption: (request: CreateOptionInput) => Promise<unknown>;
   updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
