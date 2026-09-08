@@ -4,6 +4,7 @@ export interface PresetAppApi {
   platform: NodeJS.Platform;
   version: string;
   getPresetTemplate: () => Promise<unknown>;
+  listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
   createOption: (request: {
     comment: string;
@@ -40,8 +41,9 @@ export interface PresetAppApi {
 
 const api: PresetAppApi = {
   platform: process.platform,
-  version: "0.1.0",
+  version: process.argv.find((argument) => argument.startsWith("--preset-app-version="))?.slice("--preset-app-version=".length) ?? "development",
   getPresetTemplate: () => ipcRenderer.invoke("preset:get-template") as Promise<unknown>,
+  listInstalledPresets: (rootPath) => ipcRenderer.invoke("preset:list-installed", rootPath) as Promise<unknown>,
   listOptions: () => ipcRenderer.invoke("options:list") as Promise<unknown>,
   createOption: (request) => ipcRenderer.invoke("options:create", request) as Promise<unknown>,
   updateOption: (id, request) => ipcRenderer.invoke("options:update", id, request) as Promise<unknown>,

@@ -1,4 +1,4 @@
-import type { Preset } from "../types";
+import type { InstalledPreset, Preset } from "../types";
 import { formatUpdatedDate } from "../preset-utils";
 import { Icon } from "./Icon";
 
@@ -8,9 +8,15 @@ interface PresetLibraryProps {
   onCreate: () => void;
   onOpen: (preset: Preset) => void;
   onDelete: (preset: Preset) => void;
+  installedPresets: InstalledPreset[];
+  installedConfigured: boolean;
+  installedLoading: boolean;
+  installedMessage: string;
+  onViewInstalled: (preset: InstalledPreset) => void;
+  onRefreshInstalled: () => void;
 }
 
-export function PresetLibrary({ presets, optionLabels, onCreate, onOpen, onDelete }: PresetLibraryProps) {
+export function PresetLibrary({ presets, optionLabels, onCreate, onOpen, onDelete, installedPresets, installedConfigured, installedLoading, installedMessage, onViewInstalled, onRefreshInstalled }: PresetLibraryProps) {
   const ordered = [...presets].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return (
     <main className="preset-library">
@@ -42,6 +48,22 @@ export function PresetLibrary({ presets, optionLabels, onCreate, onOpen, onDelet
           <button className="button button-primary" type="button" onClick={onCreate}>Create a preset</button>
         </div>
       )}
+      {installedConfigured && <section className="installed-presets" aria-labelledby="installed-presets-title">
+        <div className="library-heading">
+          <div><span className="step-label">SOTNRando · Read-only</span><h2 id="installed-presets-title">Installed presets</h2><p>View installed JSON or use it as a template for a new preset.</p></div>
+          <button className="button button-ghost" type="button" disabled={installedLoading} onClick={onRefreshInstalled}>Refresh</button>
+        </div>
+        <p className="installed-status" role="status">{installedLoading ? "Loading installed presets…" : installedMessage || `${installedPresets.length} installed presets`}</p>
+        {!installedLoading && !installedMessage && installedPresets.length === 0 && <p className="installed-status">No JSON presets found in the configured presets folder.</p>}
+        <div className="preset-grid">
+          {installedPresets.map((preset) => <button className="preset-card" key={preset.fileName} type="button" aria-label={`View installed preset ${preset.name}`} onClick={() => onViewInstalled(preset)}>
+            <span className="preset-card-top"><span className="preset-card-icon"><Icon name="file" /></span><span className="preset-option-count">Read-only</span></span>
+            <strong className="preset-card-name">{preset.name}</strong>
+            <span className="preset-summary">{preset.fileName}</span>
+            <span className="preset-card-footer"><span>Installed preset</span><span className="preset-card-arrow">View <Icon name="arrow" /></span></span>
+          </button>)}
+        </div>
+      </section>}
     </main>
   );
 }

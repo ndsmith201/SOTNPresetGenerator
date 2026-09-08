@@ -5,6 +5,10 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
+import { mkdirSync } from "node:fs";
+import squirrelStartup from "electron-squirrel-startup";
+import { initializeOptionsCatalog } from "./options-database";
+import { listInstalledPresets, writeNewPreset } from "./installed-presets";
 
 const execFileAsync = promisify(execFile);
 const OPTION_CATEGORIES = ["world", "items", "challenge", "relics", "gameplay"] as const;
@@ -43,105 +47,19 @@ function getOptionsDatabase(): DatabaseSync {
   return optionsDatabase;
 }
 
-function migrateOptionsCategories(database: DatabaseSync): void {
-  const table = database
-    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'options'")
-    .get() as { sql?: string } | undefined;
-  if (!table?.sql || (table.sql.includes("'relics'") && table.sql.includes("'gameplay'"))) return;
-
-  const columns = new Set(
-    (database.prepare("PRAGMA table_info(options)").all() as unknown as { name: string }[]).map((column) => column.name)
-  );
-  const addressExpression = columns.has("address") ? "address" : "NULL";
-  const descriptionExpression = columns.has("description") ? "description" : "''";
-  const readOnlyExpression = columns.has("read_only") ? "read_only" : "1";
-  const gameInitExpression = columns.has("game_init") ? "game_init" : "0";
-  const statEditExpression = columns.has("stat_edit") ? "stat_edit" : "0";
-  const rawJsonExpression = columns.has("raw_json") ? "raw_json" : "0";
-  const additionalWritesExpression = columns.has("additional_writes_json") ? "additional_writes_json" : "NULL";
-
-  database.exec(`
-    PRAGMA foreign_keys = OFF;
-    BEGIN IMMEDIATE;
-    ALTER TABLE options RENAME TO options_before_relic_category;
-    CREATE TABLE options (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      comment TEXT NOT NULL CHECK (length(trim(comment)) > 0),
-      description TEXT NOT NULL DEFAULT '',
-      read_only INTEGER NOT NULL DEFAULT 0 CHECK (read_only IN (0, 1)),
-      category TEXT NOT NULL CHECK (category IN ('world', 'items', 'challenge', 'relics', 'gameplay')),
-      type TEXT NOT NULL CHECK (type IN ('char', 'short', 'word', 'long', 'string')),
-      value TEXT NOT NULL CHECK (length(trim(value)) > 0),
-      address TEXT CHECK (address IS NULL OR length(trim(address)) > 0),
-      game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
-      stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
-      raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
-      additional_writes_json TEXT CHECK (
-        additional_writes_json IS NULL OR
-        (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array')
-      ),
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, created_at, updated_at)
-    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, created_at, updated_at
-    FROM options_before_relic_category;
-    DROP TABLE options_before_relic_category;
-    COMMIT;
-    PRAGMA foreign_keys = ON;
-  `);
-}
-
-function migrateOptionalWriteFields(database: DatabaseSync): void {
-  const columns = new Set(
-    (database.prepare("PRAGMA table_info(options)").all() as unknown as { name: string }[]).map((column) => column.name)
-  );
-  if (!columns.has("address")) {
-    database.exec(
-      "ALTER TABLE options ADD COLUMN address TEXT CHECK (address IS NULL OR length(trim(address)) > 0)"
-    );
-  }
-  if (!columns.has("additional_writes_json")) {
-    database.exec(
-      "ALTER TABLE options ADD COLUMN additional_writes_json TEXT CHECK (additional_writes_json IS NULL OR (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array'))"
-    );
-  }
-  if (!columns.has("game_init")) {
-    database.exec("ALTER TABLE options ADD COLUMN game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1))");
-  }
-  if (!columns.has("description")) {
-    database.exec("ALTER TABLE options ADD COLUMN description TEXT NOT NULL DEFAULT ''");
-  }
-  if (!columns.has("stat_edit")) {
-    database.exec("ALTER TABLE options ADD COLUMN stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1))");
-  }
-  if (!columns.has("raw_json")) {
-    database.exec("ALTER TABLE options ADD COLUMN raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1))");
-  }
-  if (!columns.has("read_only")) {
-    // Freeze the existing catalog once; options created after this migration stay editable.
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      database.exec("ALTER TABLE options ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0 CHECK (read_only IN (0, 1))");
-      database.exec("UPDATE options SET read_only = 1");
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-  }
-}
-
 async function initializeOptionsDatabase(): Promise<void> {
   const schemaPath = path.join(app.getAppPath(), "database", "schema.sql");
-  const seedPath = path.join(app.getAppPath(), "database", "seed.sql");
+  const dumpPath = path.join(app.getAppPath(), "database", "options-dump.sql");
   const databasePath = path.join(app.getPath("userData"), "options.sqlite");
-  const [schema, seed] = await Promise.all([readFile(schemaPath, "utf8"), readFile(seedPath, "utf8")]);
-  optionsDatabase = new DatabaseSync(databasePath);
-  migrateOptionsCategories(optionsDatabase);
-  optionsDatabase.exec(schema);
-  migrateOptionalWriteFields(optionsDatabase);
-  optionsDatabase.exec(seed);
+  const schema = await readFile(schemaPath, "utf8");
+  const database = new DatabaseSync(databasePath);
+  try {
+    await initializeOptionsCatalog(database, schema, () => readFile(dumpPath, "utf8"));
+    optionsDatabase = database;
+  } catch (error) {
+    database.close();
+    throw error;
+  }
 }
 
 function listOptions(): StoredOption[] {
@@ -330,11 +248,12 @@ function createWindow(): void {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      additionalArguments: [`--preset-app-version=${app.getVersion()}`]
     }
   });
 
-  void window.loadFile(path.join(__dirname, "../src/renderer/index.html"));
+  void window.loadFile(path.join(__dirname, "renderer/index.html"));
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) void shell.openExternal(url);
@@ -361,6 +280,15 @@ function registerWindowControls(): void {
   ipcMain.handle("preset:get-template", async () => {
     const templatePath = path.join(app.getAppPath(), "templates", "preset-template.json");
     return JSON.parse(await readFile(templatePath, "utf8")) as unknown;
+  });
+
+  ipcMain.handle("preset:list-installed", async (_event, rootPath: unknown) => {
+    if (typeof rootPath !== "string" || !rootPath.trim()) return { status: "error", error: "Choose a SOTNRando directory first." };
+    try {
+      return { status: "ok", ...await listInstalledPresets(path.resolve(rootPath)) };
+    } catch {
+      return { status: "error", error: "Unable to read installed presets. Check the configured SOTNRando directory." };
+    }
   });
 
   ipcMain.handle("options:list", () => {
@@ -448,25 +376,7 @@ function registerWindowControls(): void {
 
     if (await isDirectory(exportPath)) return { status: "error", error: "A directory already uses that preset name." };
     try {
-      await stat(exportPath);
-      const owner = BrowserWindow.fromWebContents(event.sender);
-      const confirmation = {
-        type: "warning" as const,
-        title: "Replace preset?",
-        message: `${path.basename(exportPath)} already exists.`,
-        detail: "Exporting will replace the existing preset file.",
-        buttons: ["Replace", "Cancel"],
-        defaultId: 1,
-        cancelId: 1
-      };
-      const response = owner ? await dialog.showMessageBox(owner, confirmation) : await dialog.showMessageBox(confirmation);
-      if (response.response !== 0) return { status: "canceled" };
-    } catch {
-      // The target does not exist yet.
-    }
-
-    try {
-      await writeFile(exportPath, `${JSON.stringify(presetJson, null, 2)}\n`, "utf8");
+      await writeNewPreset(exportPath, presetJson);
       await registerPreset(rootPath, presetId);
       await buildPresetFiles(rootPath);
       return { status: "exported", path: exportPath, presetId };
@@ -478,22 +388,31 @@ function registerWindowControls(): void {
   });
 }
 
-void app.whenReady().then(async () => {
-  try {
-    await initializeOptionsDatabase();
-  } catch (error) {
-    console.error("Unable to initialize the options database", error);
-    dialog.showErrorBox("Database unavailable", "The options database could not be initialized.");
-    app.quit();
-    return;
-  }
-  registerWindowControls();
-  createWindow();
+if (squirrelStartup) {
+  app.quit();
+} else {
+  if (process.platform === "win32") app.setAppUserModelId("com.squirrel.SOTNPresetGenerator.SOTNPresetGenerator");
+  // Keep existing data when packaging adds a human-readable productName.
+  const userDataPath = path.join(app.getPath("appData"), "sotn-preset-generator");
+  mkdirSync(userDataPath, { recursive: true });
+  app.setPath("userData", userDataPath);
+  void app.whenReady().then(async () => {
+    try {
+      await initializeOptionsDatabase();
+    } catch (error) {
+      console.error("Unable to initialize the options database", error);
+      dialog.showErrorBox("Database unavailable", "The options database could not be initialized.");
+      app.quit();
+      return;
+    }
+    registerWindowControls();
+    createWindow();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
   });
-});
+}
 
 app.on("before-quit", () => {
   optionsDatabase?.close();

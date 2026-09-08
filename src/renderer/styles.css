@@ -478,6 +478,42 @@ h1 {
   border-bottom: 1px solid var(--border);
 }
 
+.installed-presets {
+  margin-top: 48px;
+}
+
+.template-starting-relics {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.installed-status {
+  max-width: 1180px;
+  margin: 0 auto 20px;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+.preset-dialog.installed-preset-dialog {
+  width: min(860px, calc(100vw - 36px));
+}
+
+.installed-preset-dialog .preset-dialog-card {
+  max-height: calc(100vh - 48px);
+}
+
+.installed-json {
+  min-height: 0;
+  overflow: auto;
+}
+
+.preset-dialog-card > .template-help {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
 .library-heading h2 {
   margin-bottom: 8px;
   font-size: 28px;

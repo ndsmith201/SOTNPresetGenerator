@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyFile } from "node:fs/promises";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -17,3 +18,8 @@ await build({
   sourcemap: true,
   logLevel: "info"
 });
+
+await Promise.all(["index.html", "styles.css"].map((name) => copyFile(
+  path.join(projectRoot, "src", "renderer", name),
+  path.join(projectRoot, "dist", "renderer", name)
+)));
