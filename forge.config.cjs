@@ -5,6 +5,7 @@ const { promisify } = require('node:util');
 const { version } = require('./package.json');
 
 const execFileAsync = promisify(execFile);
+const windowsIcon = path.join(__dirname, 'assets/icons/castle-moon.ico');
 const [owner, name] = (process.env.GITHUB_REPOSITORY || 'ndsmith201/SOTNPresetGenerator').split('/');
 
 // Allow only runtime inputs. In particular, out/ contains local database
@@ -12,14 +13,16 @@ const [owner, name] = (process.env.GITHUB_REPOSITORY || 'ndsmith201/SOTNPresetGe
 const runtimeFiles = new Set([
   '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
-  '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json'
+  '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
+  '/assets/icons/castle-moon.ico'
 ]);
-const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/database', '/templates', '/node_modules']);
+const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/database', '/templates', '/node_modules', '/assets', '/assets/icons']);
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: windowsIcon,
     executableName: 'SOTNPresetGenerator',
     appBundleId: 'io.github.ndsmith201.sotnpresetgenerator',
     ignore: (filePath) => {
@@ -36,6 +39,7 @@ module.exports = {
         name: 'SOTNPresetGenerator',
         authors: 'ndsmith201',
         exe: 'SOTNPresetGenerator.exe',
+        setupIcon: windowsIcon,
         setupExe: `SOTNPresetGenerator-${version}-win32-${arch}-Setup.exe`,
         noMsi: true
       })

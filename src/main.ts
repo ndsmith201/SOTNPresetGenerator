@@ -236,6 +236,7 @@ async function buildPresetFiles(rootPath: string): Promise<void> {
 
 function createWindow(): void {
   const window = new BrowserWindow({
+    icon: path.join(app.getAppPath(), "assets", "icons", "castle-moon.ico"),
     width: 1320,
     height: 820,
     minWidth: 720,
@@ -374,9 +375,28 @@ function registerWindowControls(): void {
       return { status: "error", error: "The preset filename is invalid." };
     }
 
+
     if (await isDirectory(exportPath)) return { status: "error", error: "A directory already uses that preset name." };
     try {
-      await writeNewPreset(exportPath, presetJson);
+      await stat(exportPath);
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const confirmation = {
+        type: "warning" as const,
+        title: "Replace preset?",
+        message: `${path.basename(exportPath)} already exists.`,
+        detail: "Exporting will replace the existing preset file.",
+        buttons: ["Replace", "Cancel"],
+        defaultId: 1,
+        cancelId: 1
+      };
+      const response = owner ? await dialog.showMessageBox(owner, confirmation) : await dialog.showMessageBox(confirmation);
+      if (response.response !== 0) return { status: "canceled" };
+    } catch {
+      // The target does not exist yet.
+    }
+
+    try {
+      await writeFile(exportPath, `${JSON.stringify(presetJson, null, 2)}\n`, "utf8");
       await registerPreset(rootPath, presetId);
       await buildPresetFiles(rootPath);
       return { status: "exported", path: exportPath, presetId };
