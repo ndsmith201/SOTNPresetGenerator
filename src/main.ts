@@ -13,7 +13,7 @@ import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-ra
 import { BuiltPresetStore, generatePatch } from "./preset-generation";
 
 const execFileAsync = promisify(execFile);
-const builtPresets = new BuiltPresetStore();
+let builtPresets = new BuiltPresetStore();
 let generatingPreset = false;
 const OPTION_CATEGORIES = ["world", "items", "challenge", "relics", "gameplay"] as const;
 const WRITE_TYPES = ["char", "short", "word", "long", "string"] as const;
@@ -350,8 +350,8 @@ function registerWindowControls(): void {
   ipcMain.handle("preset:export", async (event, request: unknown) => {
     if (generatingPreset) return { status: "error", error: "Wait for patch generation to finish before exporting." };
     if (!request || typeof request !== "object") return { status: "error", error: "Invalid export request." };
-    const { sotnRandoPath, presetName, json } = request as Record<string, unknown>;
-    if (typeof sotnRandoPath !== "string" || typeof presetName !== "string" || typeof json !== "string") {
+    const { sotnRandoPath, presetName, json, localPresetId } = request as Record<string, unknown>;
+    if (typeof sotnRandoPath !== "string" || typeof presetName !== "string" || typeof json !== "string" || typeof localPresetId !== "string" || !localPresetId) {
       return { status: "error", error: "Invalid export request." };
     }
 
@@ -408,7 +408,7 @@ function registerWindowControls(): void {
       await writeFile(exportPath, `${JSON.stringify(presetJson, null, 2)}\n`, "utf8");
       await registerPreset(rootPath, presetId);
       await buildPresetFiles(rootPath);
-      const buildToken = await builtPresets.remember(rootPath, presetId);
+      const buildToken = await builtPresets.remember(rootPath, presetId, { localPresetId, json });
       return { status: "exported", path: exportPath, presetId, buildToken };
     } catch (error) {
       console.error("Unable to export preset", error);
@@ -416,6 +416,8 @@ function registerWindowControls(): void {
       return { status: "error", error: `The preset was not fully exported and built: ${detail}` };
     }
   });
+
+  ipcMain.handle("preset:successful-exports", () => builtPresets.listSuccessfulExports());
 
   ipcMain.handle("preset:generate", async (event, buildToken: unknown) => {
     if (generatingPreset) return { status: "error", error: "A patch is already being generated." };
@@ -454,6 +456,7 @@ if (squirrelStartup) {
   void app.whenReady().then(async () => {
     try {
       await initializeOptionsDatabase();
+      builtPresets = new BuiltPresetStore(getOptionsDatabase());
     } catch (error) {
       console.error("Unable to initialize the options database", error);
       dialog.showErrorBox("Database unavailable", "The options database could not be initialized.");

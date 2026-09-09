@@ -111,12 +111,13 @@ export function App() {
 
   useEffect(() => {
     let canceled = false;
-    void Promise.all([window.presetApp.getPresetTemplate(), fetchOptions()])
-      .then(([loadedTemplate, loadedOptions]) => {
+    void Promise.all([window.presetApp.getPresetTemplate(), fetchOptions(), window.presetApp.getSuccessfulExports()])
+      .then(([loadedTemplate, loadedOptions, loadedExports]) => {
         if (canceled) return;
         if (!isJsonObject(loadedTemplate)) throw new Error("Preset template must contain a JSON object.");
         setTemplate(loadedTemplate);
         setOptions(loadedOptions);
+        setSuccessfulExports(loadedExports);
         setPresets(loadPresets(new Set(loadedOptions.map((option) => option.id))).map((preset) => selectTemplateOptions(preset, loadedOptions)));
         setInitialized(true);
       })
@@ -203,7 +204,7 @@ export function App() {
         delete next[key];
         return next;
       });
-      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json: previewJson });
+      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json: previewJson, localPresetId: activePreset.id });
       if (!isJsonObject(result)) throw new Error("Export failed");
       if (result.status === "exported" && typeof result.path === "string" && typeof result.buildToken === "string") {
         const exported = { localPresetId: activePreset.id, directory: destination, json: previewJson, buildToken: result.buildToken };

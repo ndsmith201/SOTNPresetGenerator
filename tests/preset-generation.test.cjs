@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const { mkdtemp, mkdir, writeFile, readFile, readdir, rm } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { BuiltPresetStore, generatePatch } = require('../dist/preset-generation');
@@ -17,6 +18,84 @@ async function fixture(t) {
   await writeFile(path.join(root, 'presets', 'test.json'), '{"metadata":{"id":"test"}}');
   await writeFile(path.join(root, 'build', 'presets', 'test.js'), 'module.exports = {};');
   return root;
+}
+
+async function persistentFixture(t) {
+  const root = await fixture(t);
+  let database;
+  return {
+    root,
+    restart() {
+      database?.close();
+      database = new DatabaseSync(path.join(root, 'options.sqlite'));
+      return new BuiltPresetStore(database);
+    },
+    close() { database?.close(); }
+  };
+}
+
+test('a successful export and its generation token survive closing and reopening the database', async (t) => {
+  const fixture = await persistentFixture(t);
+  try {
+    const snapshot = { localPresetId: 'saved-draft', json: await readFile(path.join(fixture.root, 'presets/test.json'), 'utf8') };
+    const before = fixture.restart();
+    assert.deepEqual(await before.listSuccessfulExports(), {});
+    const token = await before.remember(fixture.root, 'test', snapshot);
+    const after = fixture.restart();
+    const exports = await after.listSuccessfulExports();
+    const restored = exports[JSON.stringify([fixture.root, 'test'])];
+    assert.deepEqual(restored, { ...snapshot, directory: fixture.root, buildToken: token });
+    assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, fixture.root, snapshot.json), true);
+    assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, fixture.root, '{"music":true}'), false);
+    assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, 'another directory', snapshot.json), false);
+    assert.equal((await after.resolve(token)).presetId, 'test');
+  } finally { fixture.close(); }
+});
+
+test('a failed re-export stays invalid after restart even when the previous files remain', async (t) => {
+  const fixture = await persistentFixture(t);
+  try {
+    const store = fixture.restart();
+    const token = await store.remember(fixture.root, 'test', { localPresetId: 'draft', json: '{}' });
+    store.forget(fixture.root, 'test');
+    const restarted = fixture.restart();
+    assert.deepEqual(await restarted.listSuccessfulExports(), {});
+    await assert.rejects(restarted.resolve(token), /Export and build/);
+  } finally { fixture.close(); }
+});
+
+test('a re-export of the same filename persists only the latest draft and token', async (t) => {
+  const fixture = await persistentFixture(t);
+  try {
+    const store = fixture.restart();
+    const old = await store.remember(fixture.root, 'test', { localPresetId: 'draft-a', json: '{}' });
+    const latest = await store.remember(fixture.root, 'test', { localPresetId: 'draft-b', json: '{}' });
+    const restarted = fixture.restart();
+    const exports = Object.values(await restarted.listSuccessfulExports());
+    assert.equal(exports.length, 1);
+    assert.equal(exports[0].localPresetId, 'draft-b');
+    assert.equal(exports[0].buildToken, latest);
+    await assert.rejects(restarted.resolve(old), /Export and build/);
+  } finally { fixture.close(); }
+});
+
+for (const changedFile of ['presets/test.json', 'build/presets/test.js']) {
+  for (const change of ['modified', 'deleted']) {
+    test(`startup discards persisted status if ${changedFile} was ${change} while closed`, async (t) => {
+      const fixture = await persistentFixture(t);
+      try {
+        const store = fixture.restart();
+        const token = await store.remember(fixture.root, 'test', { localPresetId: 'draft', json: '{}' });
+        const file = path.join(fixture.root, changedFile);
+        if (change === 'modified') await writeFile(file, 'external edit');
+        else await rm(file);
+        const restarted = fixture.restart();
+        assert.deepEqual(await restarted.listSuccessfulExports(), {});
+        // Invalid records are also removed from disk, rather than reappearing on the next launch.
+        await assert.rejects(fixture.restart().resolve(token), /Export and build/);
+      } finally { fixture.close(); }
+    });
+  }
 }
 
 test('Generate requires a successful export of this draft, JSON, and directory', () => {

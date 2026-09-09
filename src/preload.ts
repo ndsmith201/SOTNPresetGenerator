@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { SuccessfulExport } from "./renderer/export-state";
 
 export interface PresetAppApi {
   platform: NodeJS.Platform;
@@ -32,7 +33,8 @@ export interface PresetAppApi {
     additionalWrites?: Record<string, unknown>[];
   }) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
-  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string }) => Promise<unknown>;
+  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
+  getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;
   generatePreset: (buildToken: string) => Promise<unknown>;
   windowControls: {
     minimize: () => void;
@@ -52,6 +54,7 @@ const api: PresetAppApi = {
   updateOption: (id, request) => ipcRenderer.invoke("options:update", id, request) as Promise<unknown>,
   chooseSotnRandoPath: (currentPath) => ipcRenderer.invoke("sotnrando:choose-path", currentPath) as Promise<unknown>,
   exportPreset: (request) => ipcRenderer.invoke("preset:export", request) as Promise<unknown>,
+  getSuccessfulExports: () => ipcRenderer.invoke("preset:successful-exports") as Promise<Record<string, SuccessfulExport>>,
   generatePreset: (buildToken) => ipcRenderer.invoke("preset:generate", buildToken) as Promise<unknown>,
   windowControls: {
     minimize: () => ipcRenderer.send("window:minimize"),
