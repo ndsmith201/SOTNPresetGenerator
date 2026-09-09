@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a problem with SOTN Preset Generator.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve SOTN Preset Generator!
+        Please [check existing issues](https://github.com/ndsmith201/SOTNPresetGenerator/issues) before reporting the same problem, and report one problem per issue.
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Enter the version you are using, or the commit if running from source. If the app will not open, use the version in the download filename.
+      placeholder: "Example: 0.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: How are you running the app?
+      options:
+        - Windows installer (Setup.exe)
+        - Portable ZIP
+        - From source
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: "Example: Windows 11, version 24H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and include the exact error message, if one appeared.
+      placeholder: "Example: Export finishes, but Generate remains disabled."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Describe how to trigger the problem, including the starting template and settings that matter. If it happens only sometimes, mention that too.
+      placeholder: |
+        1. Create a new preset using ...
+        2. Enable ...
+        3. Click ...
+        4. The problem occurs when ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: Describe the result you expected.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: randomizer
+    attributes:
+      label: Randomizer / export directory
+      description: For problems with installed presets, Export, or Generate, tell us which randomizer you are using.
+      options:
+        - Bundled randomizer (default export directory)
+        - Existing randomizer selected in Settings
+        - No export directory configured
+        - Not related / not sure
+
+  - type: textarea
+    id: preset-details
+    attributes:
+      label: Preset and setup details
+      description: Include anything needed to reproduce the issue, such as the template name, selected options, extension, complexity, or custom option JSON. For export status issues, mention whether you edited the preset or restarted the app. For installation issues, mention whether this was a fresh install or an upgrade.
+      placeholder: |
+        Starting template:
+        Relevant settings or custom options:
+        Fresh install or upgrade:
+        Other details:
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots, preset JSON, or logs
+      description: Paste relevant output or attach screenshots and a preset file that reproduces the problem. You can paste JSON in a code block or attach it as a .txt or .zip file.
