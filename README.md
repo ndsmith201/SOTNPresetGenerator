@@ -1,16 +1,202 @@
 # SOTN Preset Generator
 
-An Electron + React + TypeScript desktop app for creating locally saved Symphony of the Night presets, choosing their options, and previewing their JSON representation.
+A desktop editor for assembling **Castlevania: Symphony of the Night randomizer presets**. Choose gameplay options, starting relics, a relic location extension, and a complexity target while the generated JSON updates beside your selections. Keep multiple drafts locally, use installed presets as templates, and export directly into a SOTNRando repository.
 
-Presets are stored in the Electron renderer's local storage. The app opens on the preset library; creating or selecting a preset opens the option editor with that preset's saved selections.
+![Preset editor with selected relic options and a live, syntax-highlighted JSON preview](docs/screenshots/preset-editor.png)
 
-When a SOTNRando directory is configured, the library also lists the JSON files in its `presets` folder under **Installed presets**. These are read-only: you can view or copy their original JSON, or use them as a starting template in the new preset dialog. The default `preset-template` is always available. Use **Refresh** to pick up external changes; unreadable JSON files are reported separately.
+The application builds preset configuration files. Seed generation and playing the randomized game happen in your randomizer tools. You can create drafts and copy JSON without configuring SOTNRando; browsing installed presets and exporting/building require a local SOTNRando repository.
 
-Drafts created from installed presets save their own copy of the source JSON, preserving existing settings and adding missing built-in options with the app's defaults to the generated JSON. Generated copies omit `inherits` and replace `lockLocation` with the bundled template's checks for the selected relic extension, including when reopening an existing draft. Complexity and starting-relic adjustments use those replacement locks. Drafts remain available after restarting or changing the configured directory. Export creates a new file and rejects existing filenames, so rename a draft before exporting if its name conflicts with an installed preset.
+## Contents
 
-Registered options are read-only and have an eye button for viewing and copying their details. On the first launch after this update, all existing options are marked read-only without changing their values or preset selections. Newly created options remain editable across restarts.
+- [Getting started](#getting-started)
+- [Preset library and templates](#preset-library-and-templates)
+- [Configuring a preset](#configuring-a-preset)
+- [Built-in modes](#built-in-modes)
+- [Relic logic and complexity](#relic-logic-and-complexity)
+- [Custom options](#custom-options)
+- [JSON preview and export](#json-preview-and-export)
+- [Settings, shortcuts, and local storage](#settings-shortcuts-and-local-storage)
+- [Run locally](#run-locally)
+- [Windows releases](#windows-releases)
+- [Relic location reference](#relic-location-reference)
+- [Tests](#tests)
 
-The complexity slider's maximum is calculated from all location locks in the selected relic extension and the enabled starting relics. It finds the longest sequence of pickups that each opens at least one new check; setup pickups (such as the first of two required rings) add no step. The final required Vlad pickup adds one completion step unless the required Vlads are already starting relics. Flight methods are interchangeable for movement, while distinct uses such as Mist barriers and Bat with Echo remain required. For example, starting with Bat allows a maximum of eight in Guarded and twelve in Equipment, Extended, or Scenic. This is a maximum based on access rules, not a guarantee of a particular randomized placement. The target and generated JSON are clamped when the extension or starting relics lower the maximum; if no progression remains, the target is 0.
+## Getting started
+
+Windows x64 installer and ZIP builds are distributed through this repository's [GitHub Releases](https://github.com/ndsmith201/SOTNPresetGenerator/releases). For development, see [Run locally](#run-locally).
+
+1. Open the app and click **New preset**.
+2. Enter a name and choose **Default preset-template**, or an installed preset if you have configured an export directory.
+3. Click **Continue** to open the editor. Set the relic location extension and complexity target, expand **Built-in modes**, and select any catalog options you want.
+4. Review the live **Preset JSON** pane. Changes save automatically to your local draft; **Save preset** confirms that local save.
+5. Use **Copy JSON** to copy the result, or click **Export** to write and build it in SOTNRando. The first export prompts for a repository directory if one has not been selected.
+
+Screenshots below show the current interface with example drafts and the bundled option catalog. The installed **Example base** preset is demonstration data; your installed list comes from your configured repository.
+
+## Preset library and templates
+
+The app opens to **Your presets**, a library of editable local drafts. Each card shows the preset's name, selected-option count, option summary, and last update time. Drafts are ordered by most recently updated. Click a card to resume editing, or use its trash button to delete it after confirmation. Deleting a local draft does not delete an exported JSON file.
+
+![Local preset cards and the separate read-only installed preset section](docs/screenshots/preset-library.png)
+
+Use **New preset**, the library's plus button, or **File → New preset** to create another draft. Names can contain up to 60 characters and can be changed in the editor. The name also determines the generated preset ID and export filename: for example, `Weekend challenge` becomes `weekend-challenge.json`.
+
+![New preset dialog with a name field and starting template selector](docs/screenshots/create-preset.png)
+
+### Installed presets
+
+Choose **Settings → Export directory** and select the SOTNRando repository root. The library then displays JSON files from its `presets` folder under **Installed presets**. These entries are read-only. Open one to inspect its JSON, click **Copy JSON**, or choose **Use as template** to create an editable copy with that template already selected.
+
+![Installed preset viewer with Copy JSON and Use as template actions](docs/screenshots/installed-preset.png)
+
+**Refresh** picks up external changes to the folder. Unreadable or invalid files are reported, while valid presets remain available. The default template is always available for new drafts.
+
+### What a template copy preserves
+
+A draft created from an installed preset stores its own copy of the source JSON, so it remains usable after restarting the app or changing the configured directory. Existing source settings are preserved where supported, and missing built-in settings receive the application's defaults.
+
+Generated copies omit `inherits`; the app does not recursively resolve another preset's inherited settings. They also replace the source's `lockLocation` with the bundled template's checks for the selected extension before applying starting-relic adjustments. Review the generated JSON when adapting presets with custom inheritance or access rules.
+
+Catalog options whose complete writes or raw JSON settings match the source are selected automatically. Matching ignores write comments and hexadecimal case or padding, but checks addresses and every write in an option. Matched options reuse source entries instead of duplicating them. Unchecking a matched option removes its effect from the generated copy; startup instructions become no-ops where needed to preserve code positions. Later deselections persist across restarts.
+
+## Configuring a preset
+
+The editor has two panes: **Choose options** on the left and **Preset JSON** on the right. The preview updates as you rename the preset, change settings, or toggle options.
+
+The option catalog is organized into five categories:
+
+| Category | Purpose |
+| --- | --- |
+| World & Exploration | World and traversal changes. |
+| Gameplay | General gameplay modifications. |
+| Items & Equipment | Item and equipment configuration. |
+| Relics | Starting relic options, including transformations and movement abilities. |
+| Challenge Modifiers | Options for custom challenge rules. |
+
+The exact options depend on your local catalog and the snapshot bundled with your release. Click a checkbox or option label to toggle it. The selected count updates immediately, and descriptions are available on cards and in hover/focus tooltips.
+
+- **Search options** filters option names and descriptions, ignoring case.
+- **All / Selected** switches between the full catalog and your enabled options. Search applies to both views.
+- **Clear all** deselects catalog options. It does not reset the preset name, built-in mode switches, extension, or all source-template settings. Complexity may adjust as a result.
+- The **eye** button opens a registered option for inspection. The **pencil** button edits a custom option.
+- **+ New option** adds a reusable option to the catalog. Select it separately to include it in a preset.
+
+## Built-in modes
+
+Expand **Built-in modes** above the option list to see the preset-level randomizer switches. These are separate from catalog option selections, and the collapsed panel displays how many are enabled.
+
+![Expanded built-in modes panel alongside the generated preset JSON](docs/screenshots/built-in-modes.png)
+
+These are the defaults for a new preset. An installed template's explicit boolean values are used when creating a copy.
+
+| UI setting | JSON key | Default |
+| --- | --- | --- |
+| Tournament mode | `tournamentMode` | On |
+| Zero-dollar relics | `zeroDollarRelicMode` | On |
+| Open Clock Statue | `openClockStatueMode` | On |
+| Color randomizer | `colorrandoMode` | On |
+| Randomize stats | `stats` | Off |
+| Turkey mode | `turkeyMode` | On |
+| Randomize music | `music` | Off |
+| Fast warps | `fastwarpMode` | On |
+| Max magic | `magicmaxMode` | On |
+| Surprise mode | `surpriseMode` | Off |
+| Anti-freeze | `antiFreezeMode` | On |
+| Skip prologue | `noprologueMode` | On |
+| Enemy stats | `enemyStatRandoMode` | Off |
+| Shop prices | `shopPriceRandoMode` | Off |
+| Starting room | `startRoomRandoMode` | Off |
+| 2nd Castle Starting room | `startRoomRando2ndMode` | Off |
+| RLBC mode | `rlbcMode` | On |
+
+These switches emit settings into the preset; the randomizer consuming the file determines their in-game behavior. The [JSON format reference](docs/preset-json-format.md) includes observed parser compatibility exceptions, including `tournamentMode`.
+
+## Relic logic and complexity
+
+**Relic location extension** selects which checks are included: **Guarded**, **GuardedPlus**, **Equipment**, **Scenic**, **Extended**, or **Classic**. The selection updates the JSON's extension fields and filters location locks to the appropriate check list. Classic emits `relicLocationsExtension: false`. See the [check lists by extension](docs/relic-location-extensions.md) for exact membership.
+
+Starting relic options affect more than the generated inventory writes. They also adjust entry locks, escape requirements, transformation metadata, and the maximum complexity. Relics detected in a source template's standard new-game injection routine are included and shown in the editor.
+
+The **Complexity target** slider sets `complexityGoal.min` and `metadata.metaComplexity`. Its maximum is recalculated from the selected extension's location locks and enabled starting relics. If a change lowers that maximum, both the saved target and the generated JSON are clamped automatically. If no progression remains, the target is 0 and the slider is disabled.
+
+The calculation finds the longest sequence of pickups where each pickup opens at least one new check. Setup pickups, such as the first of two required rings, add no step. The final required Vlad pickup adds one completion step unless the required Vlads are already starting relics. Flight methods are interchangeable for movement, while distinct uses such as Mist barriers and Bat with Echo remain required.
+
+For example, starting with only Soul of Bat allows a maximum of eight in Guarded and twelve in Equipment, Extended, or Scenic under the bundled rules. This is an access-rule maximum, not a guarantee of a particular randomized placement or a general difficulty rating.
+
+## Custom options
+
+Use **+ New option** to add reusable configuration to the SQLite-backed catalog. Give it a **Comment** (the name displayed on its card), an optional **Description**, and a category. New options stay editable across restarts and are available to all local presets; editing their definition affects generated output for presets that select them.
+
+![Option details dialog showing a registered option's write fields and placement controls](docs/screenshots/option-details.png)
+
+### Write options
+
+A write option defines a `char`, `short`, `word`, `long`, or `string` value. An optional hexadecimal **Address** must begin with `0x`. **Additional writes** accepts a JSON array of objects, allowing one option to contribute a sequence of writes.
+
+**Game init** places the option's writes after the template's `lui v1, 0x8004` initialization anchor. **Edits stats** orders its injected writes after relic-option writes. These two placement flags are mutually exclusive. Addressed writes and unaddressed injected writes follow the generator's template assembly rules; inspect the preview when authoring patches.
+
+### Raw JSON options
+
+Enable **Raw JSON** to enter a JSON object that merges into the top level of the preview instead of adding a write. For example:
+
+```json
+{
+  "enemyDrops": true
+}
+```
+
+The merge replaces matching top-level values; it is not a recursive merge of nested objects. The name, ID, complexity, selected extension, and extension check filtering are enforced by the generator after merging. Raw JSON disables the write address, write type, and write-placement fields. Invalid JSON, non-object raw JSON, and malformed additional-write arrays are rejected by the option dialog.
+
+Registered options are read-only: use the eye button to inspect and select/copy their values. Their settings cannot be saved over from this dialog. The read-only migration marks pre-existing options as registered without changing their values or preset selections; newly created options remain editable.
+
+## JSON preview and export
+
+The **Preset JSON** pane displays formatted, syntax-highlighted output with a **Copy JSON** button. This is a preview, not a text editor. Use the controls or a raw JSON option to change the generated configuration.
+
+The preview includes preset metadata, the selected extension and complexity, built-in mode values, location logic, and assembled writes. **Valid JSON** indicates the serialized configuration's syntax; it does not prove that a custom patch works in-game or that a randomizer build will succeed.
+
+### Export to SOTNRando
+
+Select **Settings → Export directory**, or choose a directory when prompted by your first **Export**. Select the repository root, which must contain:
+
+```text
+SOTNRando/
+  package.json
+  presets/
+  tools/
+    build-presets
+```
+
+Export performs three operations:
+
+1. Writes formatted JSON to `presets/<preset-id>.json`, with `metadata.id` set from the preset name.
+2. Adds that ID to the repository's `package.json` `presets` list if it is not already registered.
+3. Runs `tools/build-presets` from that repository using Electron's Node runtime.
+
+If the JSON file already exists, the app asks whether to **Replace** it; canceling leaves that export unperformed. To keep the existing file, rename your draft before exporting. Different display names can normalize to the same filename, so check the replacement prompt.
+
+The button reads **Building…** while export is running. A successful export reports **Exported and built** and refreshes the installed preset list. Export is not transactional: if registration or building fails after the JSON has been written, earlier filesystem changes may remain. Read the reported error and inspect the target repository before retrying. The repository must already have the dependencies and files needed by its build script.
+
+## Settings, shortcuts, and local storage
+
+**Settings** provides four preferences:
+
+| Setting | Behavior |
+| --- | --- |
+| Compact option cards | Uses denser cards to show more options in the list. |
+| Wrap JSON lines | Wraps long lines in the JSON display. |
+| Export directory | Remembers the SOTNRando root used for installed presets and export. |
+| Preset author | Overrides the author in all generated presets, including existing drafts. Leave blank to use the template author. |
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+N` | Open the new preset dialog. |
+| `Ctrl+S` | Confirm the active preset is saved locally. |
+| `Ctrl+K` | Focus option search while editing. |
+
+The renderer also accepts Command on macOS. **File** provides new/save, return to the library, delete the active draft, and exit actions. **Presets** in the editor's header returns to the library.
+
+Drafts and preferences persist automatically in the Electron renderer's local storage. Option definitions live separately in `options.sqlite`. On Windows, the application uses `%APPDATA%/sotn-preset-generator/`, retaining that data directory in packaged builds. There is no cloud synchronization. An exported preset JSON and the release's options SQL snapshot are different artifacts: the SQL snapshot contains the option catalog, not your drafts or preferences.
 
 ## Run locally
 
@@ -24,6 +210,17 @@ npm start
 ```
 
 The Electron main process owns SQLite and filesystem access. The React renderer is split into focused components under `src/renderer/components`, and esbuild produces the browser bundle used by the app.
+
+| Command | Purpose |
+| --- | --- |
+| `npm start` / `npm run dev` | Build and launch the development app through Electron Forge. |
+| `npm run build` | Compile TypeScript and bundle the renderer into `dist/`. |
+| `npm run typecheck` | Check TypeScript without emitting files. |
+| `npm test` | Compile and run the regression suite. |
+| `npm run options:dump` | Export the local option catalog to the release SQL snapshot. |
+| `npm run options:check` | Validate the committed SQL snapshot. |
+| `npm run package` | Create an unpacked application. |
+| `npm run make -- --platform=win32 --arch=x64` | Create Windows installer and ZIP artifacts. |
 
 ## Windows releases
 
@@ -50,7 +247,7 @@ git push origin HEAD --follow-tags
 
 The `npm version` hook exports your current options and includes the updated dump in the version commit before tagging. Start with a clean working tree, as required by `npm version`.
 
-For the initial version without a version bump, run `npm run options:dump`, commit `database/options-dump.sql` with the release changes, then tag with `git tag v0.1.0` and push the commit and tag. You can also run **Release Windows** manually in GitHub Actions and enter an existing tag. GitHub-hosted runners cannot access your PC's database: they validate and package the snapshot committed at that tag. To include later database changes, export and commit a fresh snapshot for a new release.
+To release the current version without a version bump, run `npm run options:dump`, commit `database/options-dump.sql` with the release changes, then create and push an unused `v<version>` tag matching `package.json`. You can also run **Release Windows** manually in GitHub Actions and enter an existing tag. GitHub-hosted runners cannot access your PC's database: they validate and package the snapshot committed at that tag. To include later database changes, export and commit a fresh snapshot for a new release.
 
 The workflow installs from `package-lock.json`, runs the tests, validates the options snapshot, builds the installer and ZIP, and uploads all Forge artifacts, including the SQL snapshot, Squirrel `.nupkg`, and `RELEASES` files. It publishes the release after all uploads succeed. Versions such as `0.2.0-beta.0` are marked as prereleases. A failed upload leaves a draft; rerunning the same tag completes missing uploads without replacing existing assets.
 
@@ -74,4 +271,6 @@ Options whose complete write sequences or raw JSON settings match the source are
 npm test
 ```
 
-This compiles TypeScript and runs the lock regression tests, including every template location with Soul of Bat, Gravity Boots + Leap Stone, and Form of Mist + Power of Mist enabled separately. The tests use real options from the SQL dump and explicit expected locks in `tests/fixtures/flight-location-locks.cjs`. Update those expectations when intentionally changing the rules or adding locations; the coverage check rejects missing or duplicate locations.
+This compiles TypeScript and runs regression coverage for location locks, extension membership, complexity, escape requirements, starting relic detection, template option matching, metadata, installed preset handling, option database initialization, and build dependency pins.
+
+The location tests include every template location with Soul of Bat, Gravity Boots + Leap Stone, and Form of Mist + Power of Mist enabled separately. They use real options from the SQL dump and explicit expected locks in `tests/fixtures/flight-location-locks.cjs`. Update those expectations when intentionally changing the rules or adding locations; the coverage check rejects missing or duplicate locations.
