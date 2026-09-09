@@ -454,6 +454,40 @@ h1 {
   cursor: wait;
 }
 
+.generate-action {
+  position: relative;
+  display: inline-flex;
+  border-radius: 9px;
+  cursor: not-allowed;
+}
+
+.generate-action > button:disabled {
+  pointer-events: none;
+}
+
+.generate-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 220px;
+  padding: 9px 12px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.generate-action:hover .generate-tooltip,
+.generate-action:focus .generate-tooltip {
+  visibility: visible;
+}
+
 .preset-library {
   min-width: 0;
   min-height: 0;

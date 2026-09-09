@@ -486,7 +486,11 @@ export function buildPreviewPreset(
   mergedMetadata.name = preset.name;
   mergedMetadata.metaComplexity = complexity.toString();
   if (extensionChanged || !Object.hasOwn(mergedMetadata, "metaExtension")) mergedMetadata.metaExtension = extension;
-  if (author?.trim()) mergedMetadata.author = [author.trim()];
+  const configuredAuthor = author?.trim();
+  if (configuredAuthor) {
+    const existingAuthors = Array.isArray(mergedMetadata.author) ? mergedMetadata.author : [];
+    mergedMetadata.author = [...existingAuthors, configuredAuthor];
+  }
   merged.metadata = mergedMetadata;
   merged.complexityGoal = { ...(isJsonObject(merged.complexityGoal) ? merged.complexityGoal : {}), min: complexity };
   if (preset.baseTemplate) delete merged.inherits;
