@@ -6,6 +6,12 @@ A desktop editor for assembling **Castlevania: Symphony of the Night randomizer 
 
 The application builds preset configuration files. Seed generation and playing the randomized game happen in your randomizer tools. You can create drafts and copy JSON without configuring SOTNRando; browsing installed presets and exporting/building require a local SOTNRando repository.
 
+The Windows installer and portable ZIP include [sotnrando](https://github.com/sotnrando/sotnrando), its dependencies, built-in presets, and license. On first launch, the app prepares a writable `sotnrando` folder in its installation directory and selects it as the default export destination. JSON exports go into `sotnrando/presets`, then the app registers and builds them using Electron's included Node runtime; no separate Git, Node.js, npm, or download is required on the user's PC.
+
+For Squirrel installs, the writable folder sits beside `Update.exe` and the `app-<version>` folders, so application upgrades preserve it. Portable apps use a `sotnrando` folder beside the executable; extract the ZIP into a writable directory. Existing writable randomizer installations are reused intact, including their current randomizer version and exported presets. Application upgrades do not overwrite or update that copy. Back it up before uninstalling or deleting the application folder. A directory explicitly selected through **Settings → Export directory** takes precedence over the bundled default; development mode still uses manual directory selection.
+
+When a SOTNRando directory is configured, the library also lists the JSON files in its `presets` folder under **Installed presets**. These are read-only: you can view or copy their original JSON, or use them as a starting template in the new preset dialog. The default `preset-template` is always available. Use **Refresh** to pick up external changes; unreadable JSON files are reported separately.
+
 ## Contents
 
 - [Getting started](#getting-started)
@@ -196,7 +202,11 @@ The button reads **Building…** while export is running. A successful export re
 
 The renderer also accepts Command on macOS. **File** provides new/save, return to the library, delete the active draft, and exit actions. **Presets** in the editor's header returns to the library.
 
-Drafts and preferences persist automatically in the Electron renderer's local storage. Option definitions live separately in `options.sqlite`. On Windows, the application uses `%APPDATA%/sotn-preset-generator/`, retaining that data directory in packaged builds. There is no cloud synchronization. An exported preset JSON and the release's options SQL snapshot are different artifacts: the SQL snapshot contains the option catalog, not your drafts or preferences.
+Drafts and preferences persist automatically in the Electron renderer's local storage. Option definitions and successful export/build records live separately in `options.sqlite`. On Windows, the application uses `%APPDATA%/sotn-preset-generator/`, retaining that data directory in packaged builds. There is no cloud synchronization. An exported preset JSON and the release's options SQL snapshot are different artifacts: the SQL snapshot contains the option catalog, not your drafts, preferences, or export/build records.
+
+After a successful **Export** and build, **Generate** saves a `.ppf` patch using that exported preset. Choose the output file in the save dialog; the containing folder opens when generation succeeds. No game image is needed to create the patch. Successful export status persists across app restarts: on startup, the app verifies the saved hashes of the exported JSON and compiled preset before restoring Generate. The current draft's JSON and export directory must also match the saved export. Changes or missing files require another export; hover or focus the disabled button's wrapper for the reminder. Export and Generate remain disabled during generation. Canceling the save dialog leaves the build available, and a failed generation keeps any existing output file intact.
+
+The complexity slider's maximum is calculated from all location locks in the selected relic extension and the enabled starting relics. It finds the longest sequence of pickups that each opens at least one new check; setup pickups (such as the first of two required rings) add no step. The final required Vlad pickup adds one completion step unless the required Vlads are already starting relics. Flight methods are interchangeable for movement, while distinct uses such as Mist barriers and Bat with Echo remain required. For example, starting with Bat allows a maximum of eight in Guarded and twelve in Equipment, Extended, or Scenic. This is a maximum based on access rules, not a guarantee of a particular randomized placement. The target and generated JSON are clamped when the extension or starting relics lower the maximum; if no progression remains, the target is 0.
 
 ## Run locally
 
@@ -234,6 +244,8 @@ npm run make -- --platform=win32 --arch=x64
 
 Distributables appear in `out/make/`. `npm run package` creates the unpacked application, and `npm start` launches Forge in development mode. Forge runs the TypeScript and renderer build automatically before packaging or starting.
 
+Packaging also runs `scripts/bundle-sotnrando.cjs`: it fetches the official commit pinned in `sotnrando.lock.json`, installs the upstream locked dependencies with lifecycle scripts disabled, explicitly builds the presets, and checks the CLI. Build machines need Git and network access to GitHub and npm. The prepared repository is included outside `app.asar` as `resources/sotnrando`, with `bundle-info.json` recording its origin and version. Run `npm run bundle:sotnrando` to prepare it separately. Update the pinned commit deliberately when changing the randomizer shipped to new installations.
+
 Local packaging automatically exports your current `%APPDATA%/sotn-preset-generator/options.sqlite` to `database/options-dump.sql`. Set `SOTN_OPTIONS_DATABASE` to use another database. Export opens the source read-only and includes committed changes even while the app is open. A missing or invalid source stops packaging. Every installer and ZIP bundles the snapshot, and `options-dump.sql` is also uploaded as a separate release asset.
 
 On first launch, the app preloads the snapshot's complete options catalog, including IDs, descriptions, write data, and read-only flags. Existing installations keep their catalog, including edits and deletions; updates do not reimport the release snapshot.
@@ -253,7 +265,7 @@ The workflow installs from `package-lock.json`, runs the tests, validates the op
 
 Authentication uses Actions' built-in `GITHUB_TOKEN` with `contents: write`; no personal access token secret is needed. For local uploads, set `GITHUB_TOKEN` and run `npm run publish -- --platform=win32 --arch=x64`; this leaves a draft release to publish on GitHub. Forge's [GitHub publisher documentation](https://www.electronforge.io/config/publishers/github) describes the authentication and publisher settings.
 
-Installers are currently unsigned; Windows may show an unknown-publisher warning. Automatic application updates are not configured. Packaged apps retain the existing `sotn-preset-generator` data directory and include only the runtime code, static assets, template, database schema, and options SQL snapshot. The snapshot contains only the options table. Local database files, backups, settings, presets, and test artifacts are excluded.
+Installers are currently unsigned; Windows may show an unknown-publisher warning. Automatic application updates are not configured. Packaged apps retain the existing `sotn-preset-generator` data directory and include the runtime code, static assets, template, database schema, options SQL snapshot, and pinned sotnrando bundle. The snapshot contains only the options table. Local database files, backups, settings, user presets, and test artifacts are excluded.
 
 ## Relic location reference
 

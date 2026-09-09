@@ -3,6 +3,7 @@ const path = require('node:path');
 const { copyFile, mkdir } = require('node:fs/promises');
 const { promisify } = require('node:util');
 const { version } = require('./package.json');
+const { bundleSotnRando, bundlePath } = require('./scripts/bundle-sotnrando.cjs');
 
 const execFileAsync = promisify(execFile);
 const windowsIcon = path.join(__dirname, 'assets/icons/castle-moon.ico');
@@ -11,7 +12,7 @@ const [owner, name] = (process.env.GITHUB_REPOSITORY || 'ndsmith201/SOTNPresetGe
 // Allow only runtime inputs. In particular, out/ contains local database
 // backups, and dist/ may contain development screenshots and test reports.
 const runtimeFiles = new Set([
-  '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js',
+  '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js', '/dist/bundled-randomizer.js', '/dist/preset-generation.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
   '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
   '/assets/icons/castle-moon.ico'
@@ -22,6 +23,7 @@ const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/databa
 module.exports = {
   packagerConfig: {
     asar: true,
+    extraResource: [bundlePath],
     icon: windowsIcon,
     executableName: 'SOTNPresetGenerator',
     appBundleId: 'io.github.ndsmith201.sotnpresetgenerator',
@@ -65,6 +67,7 @@ module.exports = {
         cwd: __dirname, windowsHide: true, maxBuffer: 10 * 1024 * 1024
       });
       console.log(stdout.trim());
+      await bundleSotnRando();
     },
     postMake: async (_config, results) => {
       if (results.length) {

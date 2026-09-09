@@ -1,3 +1,5 @@
+import type { SuccessfulExport } from "./export-state";
+
 export type OptionCategory = "world" | "gameplay" | "items" | "relics" | "challenge";
 export type WriteType = "char" | "short" | "word" | "long" | "string";
 export type MetaExtension = "Guarded" | "GuardedPlus" | "Equipment" | "Scenic" | "Extended" | "Classic";
@@ -94,12 +96,15 @@ export interface PresetAppApi {
   platform: string;
   version: string;
   getPresetTemplate: () => Promise<unknown>;
+  getDefaultSotnRandoPath: () => Promise<string | null>;
   listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
   createOption: (request: CreateOptionInput) => Promise<unknown>;
   updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
-  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string }) => Promise<unknown>;
+  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
+  getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;
+  generatePreset: (buildToken: string) => Promise<unknown>;
   windowControls: {
     minimize: () => void;
     toggleMaximize: () => void;

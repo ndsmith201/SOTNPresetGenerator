@@ -1,16 +1,23 @@
 import { Icon } from "./Icon";
+import { useId } from "react";
 
 interface TopBarProps {
   editing: boolean;
   presetCount: number;
   exporting: boolean;
+  generating: boolean;
+  canGenerate: boolean;
   onNewPreset: () => void;
   onBack: () => void;
   onExport: () => void;
+  onGenerate: () => void;
   onSave: () => void;
 }
 
 export function TopBar(props: TopBarProps) {
+  const tooltipId = useId();
+  const generateDisabled = !props.canGenerate || props.exporting || props.generating;
+  const disabledReason = props.generating ? "Generating a PPF patch…" : "Export and build the preset first.";
   return (
     <header className="topbar">
       <div className="brand">
@@ -25,7 +32,11 @@ export function TopBar(props: TopBarProps) {
         </div>
       ) : (
         <div className="topbar-actions">
-          <button className="button button-ghost button-with-icon" type="button" disabled={props.exporting} onClick={props.onExport}><Icon name="download" />{props.exporting ? "Building…" : "Export"}</button>
+          <button className="button button-ghost button-with-icon" type="button" disabled={props.exporting || props.generating} onClick={props.onExport}><Icon name="download" />{props.exporting ? "Building…" : "Export"}</button>
+          <span className="generate-action" tabIndex={generateDisabled ? 0 : undefined} aria-describedby={generateDisabled ? tooltipId : undefined}>
+            <button className="button button-ghost button-with-icon" type="button" disabled={generateDisabled} aria-describedby={generateDisabled ? tooltipId : undefined} onClick={props.onGenerate}><Icon name="spark" />{props.generating ? "Generating…" : "Generate"}</button>
+            {generateDisabled && <span className="generate-tooltip" role="tooltip" id={tooltipId}>{disabledReason}</span>}
+          </span>
           <button className="button button-primary" type="button" onClick={props.onSave}>Save preset</button>
         </div>
       )}

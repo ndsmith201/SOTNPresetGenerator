@@ -9,8 +9,12 @@ import { mkdirSync } from "node:fs";
 import squirrelStartup from "electron-squirrel-startup";
 import { initializeOptionsCatalog } from "./options-database";
 import { listInstalledPresets, writeNewPreset } from "./installed-presets";
+import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-randomizer";
+import { BuiltPresetStore, generatePatch } from "./preset-generation";
 
 const execFileAsync = promisify(execFile);
+let builtPresets = new BuiltPresetStore();
+let generatingPreset = false;
 const OPTION_CATEGORIES = ["world", "items", "challenge", "relics", "gameplay"] as const;
 const WRITE_TYPES = ["char", "short", "word", "long", "string"] as const;
 
@@ -170,8 +174,10 @@ function updateOption(id: unknown, request: unknown): StoredOption {
   return loadOption(id);
 }
 
+let bundledSotnRandoPath: string | null = null;
+
 function defaultSotnRandoPath(): string {
-  return path.join(app.getPath("documents"), "GitHub", "sotnrando");
+  return bundledSotnRandoPath ?? path.join(app.getPath("documents"), "GitHub", "sotnrando");
 }
 
 async function isDirectory(directoryPath: string): Promise<boolean> {
@@ -263,6 +269,7 @@ function createWindow(): void {
 }
 
 function registerWindowControls(): void {
+  ipcMain.handle("sotnrando:default-path", () => bundledSotnRandoPath);
   ipcMain.on("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
@@ -341,9 +348,10 @@ function registerWindowControls(): void {
   });
 
   ipcMain.handle("preset:export", async (event, request: unknown) => {
+    if (generatingPreset) return { status: "error", error: "Wait for patch generation to finish before exporting." };
     if (!request || typeof request !== "object") return { status: "error", error: "Invalid export request." };
-    const { sotnRandoPath, presetName, json } = request as Record<string, unknown>;
-    if (typeof sotnRandoPath !== "string" || typeof presetName !== "string" || typeof json !== "string") {
+    const { sotnRandoPath, presetName, json, localPresetId } = request as Record<string, unknown>;
+    if (typeof sotnRandoPath !== "string" || typeof presetName !== "string" || typeof json !== "string" || typeof localPresetId !== "string" || !localPresetId) {
       return { status: "error", error: "Invalid export request." };
     }
 
@@ -396,14 +404,43 @@ function registerWindowControls(): void {
     }
 
     try {
+      builtPresets.forget(rootPath, presetId);
       await writeFile(exportPath, `${JSON.stringify(presetJson, null, 2)}\n`, "utf8");
       await registerPreset(rootPath, presetId);
       await buildPresetFiles(rootPath);
-      return { status: "exported", path: exportPath, presetId };
+      const buildToken = await builtPresets.remember(rootPath, presetId, { localPresetId, json });
+      return { status: "exported", path: exportPath, presetId, buildToken };
     } catch (error) {
       console.error("Unable to export preset", error);
       const detail = error instanceof Error ? error.message : "Unknown build error";
       return { status: "error", error: `The preset was not fully exported and built: ${detail}` };
+    }
+  });
+
+  ipcMain.handle("preset:successful-exports", () => builtPresets.listSuccessfulExports());
+
+  ipcMain.handle("preset:generate", async (event, buildToken: unknown) => {
+    if (generatingPreset) return { status: "error", error: "A patch is already being generated." };
+    generatingPreset = true;
+    try {
+      const build = await builtPresets.resolve(buildToken);
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const options = {
+        title: "Save generated PPF patch",
+        defaultPath: path.join(app.getPath("documents"), `${build.presetId}-${Date.now()}.ppf`),
+        filters: [{ name: "PPF patch", extensions: ["ppf"] }]
+      };
+      const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) return { status: "canceled" };
+      await builtPresets.resolve(buildToken);
+      await generatePatch(build, process.execPath, result.filePath);
+      shell.showItemInFolder(result.filePath);
+      return { status: "generated", path: result.filePath };
+    } catch (error) {
+      console.error("Unable to generate patch", error);
+      return { status: "error", error: error instanceof Error ? error.message : "Unable to generate the patch." };
+    } finally {
+      generatingPreset = false;
     }
   });
 }
@@ -419,11 +456,28 @@ if (squirrelStartup) {
   void app.whenReady().then(async () => {
     try {
       await initializeOptionsDatabase();
+      builtPresets = new BuiltPresetStore(getOptionsDatabase());
     } catch (error) {
       console.error("Unable to initialize the options database", error);
       dialog.showErrorBox("Database unavailable", "The options database could not be initialized.");
       app.quit();
       return;
+    }
+    if (app.isPackaged) {
+      try {
+        const executablePath = app.getPath("exe");
+        const applicationDirectory = path.dirname(executablePath);
+        const squirrelInstall = process.platform === "win32"
+          && /^app-\d+\./.test(path.basename(applicationDirectory))
+          && await isFile(path.join(applicationDirectory, "..", "Update.exe"));
+        bundledSotnRandoPath = await initializeBundledRandomizer(
+          path.join(process.resourcesPath, "sotnrando"),
+          randomizerInstallPath(executablePath, squirrelInstall)
+        );
+      } catch (error) {
+        console.error("Unable to initialize bundled sotnrando", error);
+        dialog.showErrorBox("SOTNRando unavailable", "The bundled randomizer could not be prepared. Make sure the application is installed in a writable directory. You can also choose an existing SOTNRando directory from the Settings menu.");
+      }
     }
     registerWindowControls();
     createWindow();

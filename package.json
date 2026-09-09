@@ -14,6 +14,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "bundle:sotnrando": "node scripts/bundle-sotnrando.cjs",
     "start": "electron-forge start",
     "dev": "electron-forge start",
     "package": "electron-forge package",

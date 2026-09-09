@@ -15,9 +15,10 @@ import { InstalledPresetDialog } from "./components/InstalledPresetDialog";
 import { Toast } from "./components/Toast";
 import { TopBar } from "./components/TopBar";
 import { WindowBar } from "./components/WindowBar";
-import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTemplate, isDatabaseOption, isJsonObject, loadPresets, normalizeComplexity, persistPresets, toPresetOptions } from "./preset-utils";
+import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTemplate, isDatabaseOption, isJsonObject, loadPresets, normalizeComplexity, persistPresets, presetIdFromName, toPresetOptions } from "./preset-utils";
 import type { CreateOptionInput, DatabaseOption, InstalledPreset, JsonObject, Preset, PresetOption } from "./types";
 import { selectTemplateOptions } from "./template-options";
+import { exportMatchesCurrent, type SuccessfulExport } from "./export-state";
 
 async function fetchOptions(): Promise<PresetOption[]> {
   const response = await window.presetApp.listOptions();
@@ -40,6 +41,9 @@ export function App() {
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
   const [author, setAuthor] = useState(() => localStorage.getItem(PRESET_AUTHOR_KEY) ?? "");
   const [exporting, setExporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [successfulExports, setSuccessfulExports] = useState<Record<string, SuccessfulExport>>({});
+  const operationPending = useRef(false);
   const [toast, setToast] = useState("");
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem(COMPACT_MODE_KEY) === "true");
   const [wrapJson, setWrapJson] = useState(() => localStorage.getItem(JSON_WRAP_KEY) === "true");
@@ -59,6 +63,17 @@ export function App() {
   }, []);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    let canceled = false;
+    void window.presetApp.getDefaultSotnRandoPath().then((directory) => {
+      if (!canceled && directory) setExportPath((current) => current || directory);
+    }).catch((error: unknown) => {
+      console.error("Unable to locate bundled sotnrando", error);
+      if (!canceled) showToast("Unable to locate the bundled SOTNRando directory");
+    });
+    // Save only explicit choices so moving a portable app does not leave a stale default.
+    return () => { canceled = true; };
+  }, [showToast]);
   useEffect(() => {
     document.body.classList.toggle("compact-mode", compactMode);
     localStorage.setItem(COMPACT_MODE_KEY, compactMode.toString());
@@ -96,12 +111,13 @@ export function App() {
 
   useEffect(() => {
     let canceled = false;
-    void Promise.all([window.presetApp.getPresetTemplate(), fetchOptions()])
-      .then(([loadedTemplate, loadedOptions]) => {
+    void Promise.all([window.presetApp.getPresetTemplate(), fetchOptions(), window.presetApp.getSuccessfulExports()])
+      .then(([loadedTemplate, loadedOptions, loadedExports]) => {
         if (canceled) return;
         if (!isJsonObject(loadedTemplate)) throw new Error("Preset template must contain a JSON object.");
         setTemplate(loadedTemplate);
         setOptions(loadedOptions);
+        setSuccessfulExports(loadedExports);
         setPresets(loadPresets(new Set(loadedOptions.map((option) => option.id))).map((preset) => selectTemplateOptions(preset, loadedOptions)));
         setInitialized(true);
       })
@@ -121,6 +137,10 @@ export function App() {
   const maximumComplexity = useMemo(() => calculatePresetMaxComplexity(template, activePreset, options), [template, options, activePreset?.baseTemplate, activePreset?.metaExtension, activePreset?.optionIds]);
   const preview = useMemo(() => buildPreviewPreset(template, activePreset, options, author, maximumComplexity), [activePreset, options, template, author, maximumComplexity]);
   const boundedComplexity = normalizeComplexity(activePreset?.complexity, maximumComplexity);
+  const previewJson = useMemo(() => preview ? JSON.stringify(preview) : "", [preview]);
+  const exportKey = JSON.stringify([exportPath, presetIdFromName(activePreset?.name ?? "")]);
+  const currentExport = successfulExports[exportKey];
+  const canGenerate = Boolean(preview && exportMatchesCurrent(currentExport, activePresetId, exportPath, previewJson));
 
   const saveAuthor = (value: string) => {
     setAuthor(value);
@@ -172,20 +192,54 @@ export function App() {
   }, [exportPath, showToast]);
 
   const exportPreset = async () => {
-    if (!activePreset || !preview) return;
-    const destination = exportPath || await chooseExportPath();
-    if (!destination) return;
+    if (!activePreset || !preview || operationPending.current) return;
+    operationPending.current = true;
     setExporting(true);
     try {
-      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json: JSON.stringify(preview) });
+      const destination = exportPath || await chooseExportPath();
+      if (!destination) return;
+      const key = JSON.stringify([destination, presetIdFromName(activePreset.name)]);
+      setSuccessfulExports((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json: previewJson, localPresetId: activePreset.id });
       if (!isJsonObject(result)) throw new Error("Export failed");
-      if (result.status === "exported" && typeof result.path === "string") {
+      if (result.status === "exported" && typeof result.path === "string" && typeof result.buildToken === "string") {
+        const exported = { localPresetId: activePreset.id, directory: destination, json: previewJson, buildToken: result.buildToken };
+        setSuccessfulExports((current) => ({ ...current, [key]: exported }));
         showToast(`Exported and built ${result.path.split(/[\\/]/).pop() ?? "preset file"}`);
         setInstalledRevision((value) => value + 1);
       }
       else if (result.status === "error" && typeof result.error === "string") throw new Error(result.error);
     } catch (error) { showToast(error instanceof Error ? error.message : "Export failed"); }
-    finally { setExporting(false); }
+    finally { operationPending.current = false; setExporting(false); }
+  };
+
+  const generatePreset = async () => {
+    if (!canGenerate || !currentExport || operationPending.current) return;
+    operationPending.current = true;
+    setGenerating(true);
+    try {
+      const result = await window.presetApp.generatePreset(currentExport.buildToken);
+      if (!isJsonObject(result)) throw new Error("Patch generation failed");
+      if (result.status === "generated" && typeof result.path === "string") {
+        showToast(`Generated ${result.path.split(/[\\/]/).pop() ?? "PPF patch"}`);
+      } else if (result.status !== "canceled") {
+        throw new Error(typeof result.error === "string" ? result.error : "Patch generation failed");
+      }
+    } catch (error) {
+      setSuccessfulExports((current) => {
+        const next = { ...current };
+        delete next[exportKey];
+        return next;
+      });
+      showToast(error instanceof Error ? error.message : "Patch generation failed");
+    } finally {
+      operationPending.current = false;
+      setGenerating(false);
+    }
   };
 
   const saveOption = async (input: CreateOptionInput) => {
@@ -229,7 +283,7 @@ export function App() {
     <>
       <div className="app-shell">
         <WindowBar editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={() => setActivePresetId(null)} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
-        <TopBar editing={Boolean(activePreset)} presetCount={presets.length} exporting={exporting} onNewPreset={() => setCreatePresetOpen(true)} onBack={() => setActivePresetId(null)} onExport={() => void exportPreset()} onSave={() => showToast("Preset saved locally")} />
+        <TopBar editing={Boolean(activePreset)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={() => setActivePresetId(null)} onExport={() => void exportPreset()} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
         {activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onCopy={() => void copyPreview()} /> : <PresetLibrary presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
