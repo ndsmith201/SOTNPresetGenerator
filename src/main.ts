@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
 import type { OpenDialogOptions } from "electron";
 import { execFile } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
@@ -7,14 +7,20 @@ import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { mkdirSync } from "node:fs";
 import squirrelStartup from "electron-squirrel-startup";
-import { initializeOptionsCatalog } from "./options-database";
+import { deleteUserOption, initializeOptionsCatalog } from "./options-database";
 import { listInstalledPresets, writeNewPreset } from "./installed-presets";
 import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-randomizer";
 import { BuiltPresetStore, generatePatch } from "./preset-generation";
+import { CommunityService } from "./community-service";
+import { AppUpdater } from "./app-updater";
+import type { CommunityRequest } from "./community-types";
 
 const execFileAsync = promisify(execFile);
 let builtPresets = new BuiltPresetStore();
 let generatingPreset = false;
+let community: CommunityService | null = null;
+let updater: AppUpdater | null = null;
+let squirrelInstalled = false;
 const OPTION_CATEGORIES = ["world", "items", "challenge", "relics", "gameplay"] as const;
 const WRITE_TYPES = ["char", "short", "word", "long", "string"] as const;
 
@@ -100,7 +106,7 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   const comment = typeof candidate.comment === "string" ? candidate.comment.trim() : "";
   if (candidate.description !== undefined && typeof candidate.description !== "string") throw new Error("Description must be text.");
   const description = typeof candidate.description === "string" ? candidate.description.trim() : "";
-  if (description.length > 1000) throw new Error("Description must be 1,000 characters or fewer.");
+  if (description.length > 10000) throw new Error("Description must be 10,000 characters or fewer.");
   const category = candidate.category;
   const type = candidate.type;
   const value = typeof candidate.value === "string" ? candidate.value.trim() : "";
@@ -269,6 +275,27 @@ function createWindow(): void {
 }
 
 function registerWindowControls(): void {
+  ipcMain.handle("updates:state", () => updater?.getState() ?? { phase: "idle", currentVersion: app.getVersion() });
+  const updateActions: Record<string, () => void | Promise<void>> = {
+    "updates:install": () => { if (!updater) throw new Error("Updates are unavailable."); updater.install(); },
+    "updates:restart": () => { if (!updater) throw new Error("Updates are unavailable."); updater.restart(); },
+    "updates:download": async () => {
+      const release = updater?.getState().release;
+      if (!release) throw new Error("No update is available.");
+      await shell.openExternal(release.pageUrl);
+    }
+  };
+  for (const [channel, action] of Object.entries(updateActions)) {
+    ipcMain.handle(channel, async event => {
+      if (event.senderFrame !== event.sender.mainFrame) return { status: "error", error: "Invalid update request." };
+      try { await action(); return { status: "ok" }; }
+      catch (error) { return { status: "error", error: error instanceof Error ? error.message : "Unable to update." }; }
+    });
+  }
+  ipcMain.handle("community:request", (event, request: CommunityRequest) => {
+    if (event.senderFrame !== event.sender.mainFrame || !community) return { status: "error", error: "Community service is unavailable." };
+    return community.request(request);
+  });
   ipcMain.handle("sotnrando:default-path", () => bundledSotnRandoPath);
   ipcMain.on("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
@@ -314,6 +341,15 @@ function registerWindowControls(): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create the option.";
       return { status: "error", error: message };
+    }
+  });
+
+  ipcMain.handle("options:delete", (_event, id: unknown) => {
+    try {
+      deleteUserOption(getOptionsDatabase(), id);
+      return { status: "deleted" };
+    } catch (error) {
+      return { status: "error", error: error instanceof Error ? error.message : "Unable to delete the option." };
     }
   });
 
@@ -463,6 +499,30 @@ if (squirrelStartup) {
       app.quit();
       return;
     }
+    try {
+      const database = getOptionsDatabase();
+      database.exec("CREATE TABLE IF NOT EXISTS community_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      community = new CommunityService({
+        database,
+        builds: builtPresets,
+        createOption: (input) => ({ ...createOption(input) }),
+        loadOption: (id) => ({ ...loadOption(id) }),
+        storage: {
+          read: (key) => database.prepare("SELECT value FROM community_settings WHERE key = ?").get(key)?.value as string | undefined,
+          write: (key, value) => {
+            if (value === null) database.prepare("DELETE FROM community_settings WHERE key = ?").run(key);
+            else database.prepare("INSERT OR REPLACE INTO community_settings (key, value) VALUES (?, ?)").run(key, value);
+          },
+          encrypt: (value) => {
+            if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) return null;
+            return safeStorage.encryptString(value).toString("base64");
+          },
+          decrypt: (value) => safeStorage.decryptString(Buffer.from(value, "base64"))
+        }
+      });
+    } catch {
+      console.error("Unable to initialize community settings. Local editing remains available.");
+    }
     if (app.isPackaged) {
       try {
         const executablePath = app.getPath("exe");
@@ -470,6 +530,7 @@ if (squirrelStartup) {
         const squirrelInstall = process.platform === "win32"
           && /^app-\d+\./.test(path.basename(applicationDirectory))
           && await isFile(path.join(applicationDirectory, "..", "Update.exe"));
+        squirrelInstalled = squirrelInstall;
         bundledSotnRandoPath = await initializeBundledRandomizer(
           path.join(process.resourcesPath, "sotnrando"),
           randomizerInstallPath(executablePath, squirrelInstall)
@@ -479,8 +540,17 @@ if (squirrelStartup) {
         dialog.showErrorBox("SOTNRando unavailable", "The bundled randomizer could not be prepared. Make sure the application is installed in a writable directory. You can also choose an existing SOTNRando directory from the Settings menu.");
       }
     }
+    updater = new AppUpdater({
+      currentVersion: app.getVersion(), enabled: app.isPackaged && process.platform === "win32",
+      arch: process.arch, squirrelInstalled, updater: autoUpdater,
+      onState: state => { for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send("updates:state-changed", state); },
+      log: error => console.warn("App update", error)
+    });
     registerWindowControls();
     createWindow();
+    // The installer holds a lock during its first launch; let it finish first.
+    const updateTimer = setTimeout(() => { void updater?.check(); }, process.argv.includes("--squirrel-firstrun") ? 10_000 : 1_000);
+    updateTimer.unref();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

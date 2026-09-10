@@ -3,9 +3,7 @@
     "id": "your-preset-id",
     "name": "Your Preset Name",
     "description": "Describe the intended route, difficulty, and special rules.",
-    "author": [
-      "Your Name"
-    ],
+    "author": [],
     "weight": 0,
     "knowledgeCheck": "None",
     "metaExtension": "Guarded",

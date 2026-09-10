@@ -18,6 +18,11 @@ export type IconName =
   | "relic"
   | "search"
   | "trash"
+  | "heart"
+  | "thumb-up"
+  | "thumb-down"
+  | "share"
+  | "menu"
   | "spark";
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
@@ -39,6 +44,11 @@ export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGEle
     relic: <><circle cx="12" cy="12" r="7.5" /><path d="M12 7.5v9M7.5 12h9" /></>,
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>,
     trash: <><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></>,
+    heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
+    "thumb-up": <><path d="M7 10 12 3c2 0 3 1 2 4l-1 3h6a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7Z" /><path d="M3 10h4v11H3Z" /></>,
+    "thumb-down": <g transform="rotate(180 12 12)"><path d="M7 10 12 3c2 0 3 1 2 4l-1 3h6a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7Z" /><path d="M3 10h4v11H3Z" /></g>,
+    share: <><path d="M12 16V3m-5 5 5-5 5 5M5 13v7h14v-7" /></>,
+    menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     spark: <><path d="m12 2 1.4 6.6L20 10l-6.6 1.4L12 18l-1.4-6.6L4 10l6.6-1.4L12 2Z" /><path d="m18.5 16 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z" /></>
   };
   return <svg viewBox={name === "check" ? "0 0 16 16" : "0 0 24 24"} aria-hidden="true" {...props}>{paths[name]}</svg>;

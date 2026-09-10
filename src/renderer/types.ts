@@ -1,4 +1,6 @@
+import type { UpdateApi } from "../update-types";
 import type { SuccessfulExport } from "./export-state";
+import type { CommunityRequest, CommunityResult } from "../community-types";
 
 export type OptionCategory = "world" | "gameplay" | "items" | "relics" | "challenge";
 export type WriteType = "char" | "short" | "word" | "long" | "string";
@@ -93,12 +95,15 @@ export interface CreateOptionInput {
 }
 
 export interface PresetAppApi {
+  updates: UpdateApi;
+  community: (request: CommunityRequest) => Promise<CommunityResult>;
   platform: string;
   version: string;
   getPresetTemplate: () => Promise<unknown>;
   getDefaultSotnRandoPath: () => Promise<string | null>;
   listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
+  deleteOption: (id: number) => Promise<unknown>;
   createOption: (request: CreateOptionInput) => Promise<unknown>;
   updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;

@@ -1,8 +1,11 @@
 import { Icon } from "./Icon";
+import type { ReactNode } from "react";
 import { useId } from "react";
 
 interface TopBarProps {
   editing: boolean;
+  communityActions?: ReactNode;
+  onShare: () => void;
   presetCount: number;
   exporting: boolean;
   generating: boolean;
@@ -25,7 +28,7 @@ export function TopBar(props: TopBarProps) {
         <div className="brand-copy"><span className="eyebrow">Randomizer tools</span><h1>SOTN Preset Generator</h1></div>
         {props.editing && <button className="button button-ghost button-with-icon presets-back-button" type="button" aria-label="Back to presets" onClick={props.onBack}><Icon name="back" />Presets</button>}
       </div>
-      {!props.editing ? (
+      {props.communityActions ? <div className="topbar-actions">{props.communityActions}</div> : !props.editing ? (
         <div className="topbar-actions">
           <span className="preset-total"><strong>{props.presetCount}</strong> presets</span>
           <button className="button button-primary" type="button" onClick={props.onNewPreset}><Icon name="plus" />New preset</button>
@@ -38,6 +41,7 @@ export function TopBar(props: TopBarProps) {
             {generateDisabled && <span className="generate-tooltip" role="tooltip" id={tooltipId}>{disabledReason}</span>}
           </span>
           <button className="button button-primary" type="button" onClick={props.onSave}>Save preset</button>
+          <button className="button button-ghost button-with-icon" disabled={props.exporting || props.generating} onClick={props.onShare}><Icon name="share" />Share</button>
         </div>
       )}
     </header>
