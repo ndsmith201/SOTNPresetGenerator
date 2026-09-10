@@ -26,7 +26,7 @@ export function UpdateDialog({ state, onLater, onRestart }: { state: UpdateState
   };
   return <dialog ref={ref} className="preset-dialog update-dialog" aria-labelledby="updateTitle" onCancel={event => { event.preventDefault(); close(); }}>
     <div className="preset-dialog-card">
-      <span className="step-label">App update</span><h2 id="updateTitle">{busy ? "Updating your app" : "A new version is available"}</h2>
+      <span className="step-label">App update</span><h2 id="updateTitle">{busy ? <>Updating your app<span className="update-ellipsis" aria-hidden="true">.<span>.</span><span>.</span></span></> : "A new version is available"}</h2>
       <p>Version {state.release?.version} is available. You’re using {state.currentVersion}.</p>
       {busy ? <p role="status">{state.phase === "downloading" ? "Downloading and preparing the update… The app will restart when it’s ready." : "Saving your presets and restarting…"}</p> : state.release?.automatic ?
         <p>Update now and restart the app. Your saved presets, options, settings, and login will be kept.</p> :

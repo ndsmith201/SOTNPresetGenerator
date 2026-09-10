@@ -15,6 +15,7 @@ export function ShareDialog({ name, kind, json, needsBuild, onClose, onShare }: 
     <div className="preset-dialog-card">
       <span className="step-label">Community</span><h2 id="shareTitle">Share {kind}?</h2>
       <p>Share “{name}” publicly with the community? Anyone can view and use this {kind}.</p>
+      {kind === "preset" && <p>If a community preset has the same name and lists your username as an author, sharing updates that preset and keeps its votes.</p>}
       {needsBuild && <p>The preset will be exported and built before sharing.</p>}
       <details><summary>Review {kind} JSON</summary><pre className="community-json">{JSON.stringify(json, null, 2)}</pre></details>
       {error && <p className="community-error" role="alert">{error}</p>}

@@ -239,7 +239,7 @@ test('option imports persist catalog-to-local mappings, avoid duplicates, and pr
   } finally { database.close(); }
 });
 
-test('sharing strips local option fields and sends verified preset files; stale builds are rejected', async t => {
+test('sharing strips local option fields and accepts an updated preset with its existing ID and votes; stale builds are rejected', async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'community-share-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, 'presets')); await mkdir(path.join(root, 'build', 'presets'), { recursive: true });
@@ -254,16 +254,27 @@ test('sharing strips local option fields and sends verified preset files; stale 
   assert.deepEqual(optionSubmission(local), data);
   const store = storage(); store.write('config', JSON.stringify({ ...DEFAULT_COMMUNITY_CONFIG, apiUrl: 'http://localhost:8080', devUser: 'alice' }));
   const submitted = [];
+  const updated = item('presets', { upvotes: 7, downvotes: 2, score: 5 });
   const service = new CommunityService({ database, storage: store, builds, createOption() { throw new Error('Unexpected import'); }, loadOption: () => local,
-    fetcher: async (url, init) => { submitted.push(init.body); return response(item(url.endsWith('/presets') ? 'presets' : 'options'), 201); } });
+    fetcher: async (url, init) => { submitted.push(init.body); return url.endsWith('/presets') ? response(updated, 200) : response(item('options'), 201); } });
   assert.equal((await service.request({ action: 'shareOption', localId: 42 })).status, 'ok');
   assert.deepEqual(JSON.parse(submitted[0]), data);
-  assert.equal((await service.request({ action: 'sharePreset', buildToken: token })).status, 'ok');
+  assert.deepEqual(await service.request({ action: 'sharePreset', buildToken: token }), { status: 'ok', data: updated });
   assert.equal(submitted[1], json);
   await writeFile(path.join(root, 'presets/example.json'), '{}');
   const stale = await service.request({ action: 'sharePreset', buildToken: token });
   assert.equal(stale.status, 'error'); assert.match(stale.error, /Export and build/);
   assert.equal(submitted.length, 2);
+});
+
+test('preset author rejection is surfaced without retrying or creating a duplicate', async () => {
+  let calls = 0;
+  const client = new CommunityClient(DEFAULT_COMMUNITY_CONFIG, async () => 'access-token', async () => {
+    calls++;
+    return response({ error: { code: 'forbidden', message: 'A preset with this name exists; only its listed authors can update it.' } }, 403);
+  });
+  await assert.rejects(client.create('presets', JSON.stringify(item('presets').data)), /only its listed authors/);
+  assert.equal(calls, 1);
 });
 
 

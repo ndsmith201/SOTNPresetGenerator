@@ -20,7 +20,7 @@ import type {
 } from "./types";
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
-import { selectTemplateOptions, templateWithOptionSelections } from "./template-options";
+import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections } from "./template-options";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -323,8 +323,7 @@ function isReturnJump(write: WriteEntry): boolean {
 function isGameInitAnchor(write: WriteEntry): boolean {
   return (
     write.type === "word" &&
-    write.value === "0x3c038004" &&
-    write.comment === "lui v1, 0x8004"
+    Number(write.value) === 0x3c038004
   );
 }
 
@@ -466,7 +465,21 @@ export function buildPreviewPreset(
   const injected = injectionOrder.flatMap((option) => structuredClone(option.injectedWrites));
   const gameInit = additions.flatMap((option) => structuredClone(option.gameInitWrites));
   const appended = additions.flatMap((option) => structuredClone(option.appendedWrites));
-  const gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);
+  let gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);
+  const selectedGameInit = selected.filter((option) => option.gameInitWrites.length > 0);
+  if (gameInitAnchorIndex < 0 && selectedGameInit.length > 0) {
+    // Installed presets may only initialize the relic bank (0x8009). Game
+    // init stores need their own bank setup, including already-matched options
+    // in drafts exported before the missing-anchor fallback was corrected.
+    const inheritedIndices = matchTemplateOptions({ writes: templateWrites }, selectedGameInit)
+      .flatMap((match) => match.writeIndices);
+    const returnIndex = templateWrites.findIndex(isReturnJump);
+    gameInitAnchorIndex = inheritedIndices.length > 0 ? Math.min(...inheritedIndices)
+      : returnIndex < 0 ? templateWrites.length : returnIndex;
+    templateWrites.splice(gameInitAnchorIndex, 0, {
+      type: "word", value: "0x3c038004", comment: "lui v1, 0x8004"
+    });
+  }
   if (gameInitAnchorIndex >= 0) {
     templateWrites.splice(gameInitAnchorIndex, 0, ...injected);
     const shiftedAnchorIndex = gameInitAnchorIndex + injected.length;
