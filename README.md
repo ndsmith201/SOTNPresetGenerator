@@ -2,6 +2,8 @@
 
 A desktop editor for assembling **Castlevania: Symphony of the Night randomizer presets**. Choose gameplay options, starting relics, a relic location extension, and a complexity target while the generated JSON updates beside your selections. Keep multiple drafts locally, use installed presets as templates, and export directly into a SOTNRando repository.
 
+See the [Privacy Policy](PRIVACY.md) for local data storage, community accounts and public sharing, automatic network connections, and deletion choices.
+
 ![Preset editor with selected relic options and a live, syntax-highlighted JSON preview](docs/screenshots/preset-editor.png)
 
 The application builds preset configuration files. Seed generation and playing the randomized game happen in your randomizer tools. You can create drafts and copy JSON without configuring SOTNRando; browsing installed presets and exporting/building require a local SOTNRando repository.
