@@ -19,7 +19,7 @@ interface WindowBarProps {
 }
 
 export function WindowBar(props: WindowBarProps) {
-  const [openMenu, setOpenMenu] = useState<"file" | "settings" | "community" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"file" | "community" | "settings" | "help" | null>(null);
   const menuRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -38,12 +38,6 @@ export function WindowBar(props: WindowBarProps) {
     <div className="window-bar">
       <nav className="app-menu" aria-label="Application menu" ref={menuRef}>
         <div className="menu-root">
-          <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "community"} onClick={() => setOpenMenu(openMenu === "community" ? null : "community")}>Community</button>
-          <div className="menu-popover" role="menu" hidden={openMenu !== "community"}>
-            <button type="button" role="menuitem" onClick={() => act(props.onCommunity)}>Login</button>
-          </div>
-        </div>
-        <div className="menu-root">
           <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "file"} onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}>File</button>
           <div className="menu-popover" role="menu" hidden={openMenu !== "file"}>
             <button type="button" role="menuitem" onClick={() => act(props.onNewPreset)}><span>New preset</span><kbd>Ctrl N</kbd></button>
@@ -52,6 +46,12 @@ export function WindowBar(props: WindowBarProps) {
             {props.editing && <button className="danger-text" type="button" role="menuitem" onClick={() => act(props.onDeletePreset)}>Delete preset…</button>}
             <span className="menu-separator" role="separator" />
             <button type="button" role="menuitem" onClick={() => window.presetApp.windowControls.close()}>Exit</button>
+          </div>
+        </div>
+        <div className="menu-root">
+          <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "community"} onClick={() => setOpenMenu(openMenu === "community" ? null : "community")}>Community</button>
+          <div className="menu-popover" role="menu" hidden={openMenu !== "community"}>
+            <button type="button" role="menuitem" onClick={() => act(props.onCommunity)}>Login</button>
           </div>
         </div>
         <div className="menu-root">
@@ -68,6 +68,12 @@ export function WindowBar(props: WindowBarProps) {
               <span className="path-menu-copy"><strong>Preset author</strong><small title={props.author}>{props.author || "Use template author"}</small></span>
               <Icon name="file" />
             </button>
+          </div>
+        </div>
+        <div className="menu-root">
+          <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "help"} onClick={() => setOpenMenu(openMenu === "help" ? null : "help")}>Help</button>
+          <div className="menu-popover" role="menu" hidden={openMenu !== "help"}>
+            <button type="button" role="menuitem" onClick={() => act(() => { window.open("https://github.com/ndsmith201/SOTNPresetGenerator/issues/new", "_blank"); })}>Report bug/issue</button>
           </div>
         </div>
       </nav>
