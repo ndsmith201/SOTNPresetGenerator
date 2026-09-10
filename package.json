@@ -20,6 +20,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
+    "release": "node scripts/release.cjs",
     "options:dump": "node scripts/export-options.cjs",
     "options:check": "node scripts/export-options.cjs --check",
     "version": "npm run options:dump && git add database/options-dump.sql",
