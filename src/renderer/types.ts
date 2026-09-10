@@ -1,4 +1,5 @@
 import type { SuccessfulExport } from "./export-state";
+import type { CommunityRequest, CommunityResult } from "../community-types";
 
 export type OptionCategory = "world" | "gameplay" | "items" | "relics" | "challenge";
 export type WriteType = "char" | "short" | "word" | "long" | "string";
@@ -93,6 +94,7 @@ export interface CreateOptionInput {
 }
 
 export interface PresetAppApi {
+  community: (request: CommunityRequest) => Promise<CommunityResult>;
   platform: string;
   version: string;
   getPresetTemplate: () => Promise<unknown>;

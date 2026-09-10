@@ -19,6 +19,7 @@ import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTempl
 import type { CreateOptionInput, DatabaseOption, InstalledPreset, JsonObject, Preset, PresetOption } from "./types";
 import { selectTemplateOptions } from "./template-options";
 import { exportMatchesCurrent, type SuccessfulExport } from "./export-state";
+import { CommunityDialog } from "./components/CommunityDialog";
 
 async function fetchOptions(): Promise<PresetOption[]> {
   const response = await window.presetApp.listOptions();
@@ -38,6 +39,7 @@ export function App() {
   const [createOptionOpen, setCreateOptionOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<DatabaseOption | null>(null);
   const [authorSettingsOpen, setAuthorSettingsOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
   const [author, setAuthor] = useState(() => localStorage.getItem(PRESET_AUTHOR_KEY) ?? "");
   const [exporting, setExporting] = useState(false);
@@ -269,6 +271,7 @@ export function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (communityOpen) return;
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
       if (key === "n") { event.preventDefault(); setCreatePresetOpen(true); }
@@ -277,12 +280,12 @@ export function App() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [activePreset, showToast]);
+  }, [activePreset, communityOpen, showToast]);
 
   return (
     <>
       <div className="app-shell">
-        <WindowBar editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={() => setActivePresetId(null)} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
+        <WindowBar onCommunity={() => setCommunityOpen(true)} editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={() => setActivePresetId(null)} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
         <TopBar editing={Boolean(activePreset)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={() => setActivePresetId(null)} onExport={() => void exportPreset()} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
         {activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onCopy={() => void copyPreview()} /> : <PresetLibrary presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
@@ -292,6 +295,14 @@ export function App() {
       <AuthorSettingsDialog open={authorSettingsOpen} author={author} onClose={() => setAuthorSettingsOpen(false)} onSave={saveAuthor} />
       <DeletePresetDialog preset={presetToDelete} onClose={() => setPresetToDelete(null)} onDelete={deletePreset} />
       <Toast message={toast} />
+      {communityOpen && <CommunityDialog options={options} presetName={activePreset?.name ?? ""} preview={preview} buildToken={canGenerate && !exporting && !generating ? currentExport?.buildToken : undefined}
+        onClose={() => setCommunityOpen(false)} onOptionsImported={async () => setOptions(await fetchOptions())}
+        onPresetImported={(name, json) => {
+          if (!initialized) throw new Error("The local option catalog is still loading.");
+          const preset = createPresetFromTemplate(name, json, options);
+          setPresets(current => [...current, preset]); setActivePresetId(preset.id); setCommunityOpen(false);
+          showToast("Community preset copied to your local drafts");
+        }} />}
     </>
   );
 }

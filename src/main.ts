@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
 import type { OpenDialogOptions } from "electron";
 import { execFile } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
@@ -11,10 +11,13 @@ import { initializeOptionsCatalog } from "./options-database";
 import { listInstalledPresets, writeNewPreset } from "./installed-presets";
 import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-randomizer";
 import { BuiltPresetStore, generatePatch } from "./preset-generation";
+import { CommunityService } from "./community-service";
+import type { CommunityRequest } from "./community-types";
 
 const execFileAsync = promisify(execFile);
 let builtPresets = new BuiltPresetStore();
 let generatingPreset = false;
+let community: CommunityService | null = null;
 const OPTION_CATEGORIES = ["world", "items", "challenge", "relics", "gameplay"] as const;
 const WRITE_TYPES = ["char", "short", "word", "long", "string"] as const;
 
@@ -100,7 +103,7 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   const comment = typeof candidate.comment === "string" ? candidate.comment.trim() : "";
   if (candidate.description !== undefined && typeof candidate.description !== "string") throw new Error("Description must be text.");
   const description = typeof candidate.description === "string" ? candidate.description.trim() : "";
-  if (description.length > 1000) throw new Error("Description must be 1,000 characters or fewer.");
+  if (description.length > 10000) throw new Error("Description must be 10,000 characters or fewer.");
   const category = candidate.category;
   const type = candidate.type;
   const value = typeof candidate.value === "string" ? candidate.value.trim() : "";
@@ -269,6 +272,10 @@ function createWindow(): void {
 }
 
 function registerWindowControls(): void {
+  ipcMain.handle("community:request", (event, request: CommunityRequest) => {
+    if (event.senderFrame !== event.sender.mainFrame || !community) return { status: "error", error: "Community service is unavailable." };
+    return community.request(request);
+  });
   ipcMain.handle("sotnrando:default-path", () => bundledSotnRandoPath);
   ipcMain.on("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
@@ -462,6 +469,30 @@ if (squirrelStartup) {
       dialog.showErrorBox("Database unavailable", "The options database could not be initialized.");
       app.quit();
       return;
+    }
+    try {
+      const database = getOptionsDatabase();
+      database.exec("CREATE TABLE IF NOT EXISTS community_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      community = new CommunityService({
+        database,
+        builds: builtPresets,
+        createOption: (input) => ({ ...createOption(input) }),
+        loadOption: (id) => ({ ...loadOption(id) }),
+        storage: {
+          read: (key) => database.prepare("SELECT value FROM community_settings WHERE key = ?").get(key)?.value as string | undefined,
+          write: (key, value) => {
+            if (value === null) database.prepare("DELETE FROM community_settings WHERE key = ?").run(key);
+            else database.prepare("INSERT OR REPLACE INTO community_settings (key, value) VALUES (?, ?)").run(key, value);
+          },
+          encrypt: (value) => {
+            if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) return null;
+            return safeStorage.encryptString(value).toString("base64");
+          },
+          decrypt: (value) => safeStorage.decryptString(Buffer.from(value, "base64"))
+        }
+      });
+    } catch {
+      console.error("Unable to initialize community settings. Local editing remains available.");
     }
     if (app.isPackaged) {
       try {

@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { SuccessfulExport } from "./renderer/export-state";
+import type { CommunityRequest, CommunityResult } from "./community-types";
 
 export interface PresetAppApi {
+  community: (request: CommunityRequest) => Promise<CommunityResult>;
   platform: NodeJS.Platform;
   version: string;
   getPresetTemplate: () => Promise<unknown>;
@@ -44,6 +46,7 @@ export interface PresetAppApi {
 }
 
 const api: PresetAppApi = {
+  community: (request) => ipcRenderer.invoke("community:request", request),
   platform: process.platform,
   version: process.argv.find((argument) => argument.startsWith("--preset-app-version="))?.slice("--preset-app-version=".length) ?? "development",
   getPresetTemplate: () => ipcRenderer.invoke("preset:get-template") as Promise<unknown>,

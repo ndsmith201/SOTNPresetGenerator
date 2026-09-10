@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 
 interface WindowBarProps {
+  onCommunity: () => void;
   editing: boolean;
   compactMode: boolean;
   wrapJson: boolean;
@@ -36,6 +37,7 @@ export function WindowBar(props: WindowBarProps) {
   return (
     <div className="window-bar">
       <nav className="app-menu" aria-label="Application menu" ref={menuRef}>
+        <button className="menu-trigger" type="button" onClick={() => act(props.onCommunity)}>Community</button>
         <div className="menu-root">
           <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "file"} onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}>File</button>
           <div className="menu-popover" role="menu" hidden={openMenu !== "file"}>

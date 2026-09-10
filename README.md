@@ -15,6 +15,7 @@ When a SOTNRando directory is configured, the library also lists the JSON files 
 ## Contents
 
 - [Getting started](#getting-started)
+- [Community catalog](#community-catalog)
 - [Preset library and templates](#preset-library-and-templates)
 - [Configuring a preset](#configuring-a-preset)
 - [Built-in modes](#built-in-modes)
@@ -38,6 +39,22 @@ Windows x64 installer and ZIP builds are distributed through this repository's [
 5. Use **Copy JSON** to copy the result, or click **Export** to write and build it in SOTNRando. The first export prompts for a repository directory if one has not been selected.
 
 Screenshots below show the current interface with example drafts and the bundled option catalog. The installed **Example base** preset is demonstration data; your installed list comes from your configured repository.
+
+## Community catalog
+
+Open **Community** in the application menu to browse shared **Presets** and **Options** from SOTNPresetAPI. The public deployment is configured automatically. Community access requires an internet connection; local drafts, options, exports, and patch generation continue to work offline.
+
+- Select an item to inspect its JSON and vote totals. **Load more** follows the API's page cursor, including empty pages that have more results. Search filters the items already loaded; catalog order is by ID, not score.
+- **Add to my options** imports an option into the local catalog with a new numeric ID. Its community ID is tracked separately, so importing the same item again reuses the local option and preserves any local edits.
+- **Use as template** creates an editable local preset. As with installed templates, the editor replaces location rules and does not resolve inherited presets. **Copy JSON** copies the community item's original configuration.
+- Open **Share** to submit a local option or the currently open preset. Presets must first be exported and built with their current changes. Review the JSON and click **Share publicly** to submit. Local option IDs and read-only flags are excluded; presets use the verified exported file. Submissions are limited to 128 KiB. Each submission creates a new entry, so uncertain failures are not retried automatically.
+- Signed-in users can **Upvote**, **Downvote**, or **Remove my vote**. Each account has one vote per item. Totals refresh after a vote; the API does not return your existing personal vote when browsing.
+
+Browsing and importing are public. **Sign in** also offers account creation, email confirmation, resending confirmation codes, and password recovery. Passwords are never saved. Access tokens stay in the Electron main process; refresh tokens are encrypted using the operating system's secure storage and saved in the local database. If secure storage is unavailable, sign-in lasts only for the current session. Signing out removes the saved session on this device. Additional Cognito challenges such as MFA are not currently supported.
+
+**Account → Connection settings** lets you choose another deployment's API URL, Cognito region, and public app client ID. Saving connection settings signs you out. HTTPS is required except for loopback development URLs; a development identity sends `X-Dev-User` only to a localhost API. **Check saved connection** checks `/healthz`. The default deployment configuration comes from the API project's Bruno AWS environment, and the integration follows its `openai.json` OpenAPI contract.
+
+Community account settings and import mappings are local and excluded from release option dumps. Responses with integers that JavaScript cannot represent exactly are rejected instead of silently changing their values.
 
 ## Preset library and templates
 
