@@ -258,6 +258,7 @@ The Electron main process owns SQLite and filesystem access. The React renderer 
 | `npm test` | Compile and run the regression suite. |
 | `npm run options:dump` | Export the local option catalog to the release SQL snapshot. |
 | `npm run options:check` | Validate the committed SQL snapshot. |
+| `npm run release <major\|minor\|patch>` | Bump the version, export options, and push the version commit and tag to start a release. |
 | `npm run package` | Create an unpacked application. |
 | `npm run make -- --platform=win32 --arch=x64` | Create Windows installer and ZIP artifacts. |
 
@@ -282,11 +283,10 @@ On first launch, the app preloads the snapshot's complete options catalog, inclu
 The **Release Windows** GitHub Actions workflow publishes to this repository's **GitHub Releases** when a `v*` tag is pushed. The tag must match `package.json` exactly and point to the checked-out commit. After committing the application and workflow changes, a typical release is:
 
 ```bash
-npm version patch
-git push origin HEAD --follow-tags
+npm run release patch
 ```
 
-The `npm version` hook exports your current options and includes the updated dump in the version commit before tagging. Start with a clean working tree, as required by `npm version`.
+Use `major`, `minor`, or `patch` for the desired version bump; `npm run release -- patch` also works. The command runs `npm version`, whose hook exports your current options and includes the updated dump in the version commit before tagging. It then pushes the current branch and the new `v<version>` tag to `origin` atomically, triggering the release workflow. Start with a clean working tree, as required by `npm version`, and an available local options database. If the push fails, the commit and tag remain local; use the retry command printed by the script instead of bumping the version again.
 
 To release the current version without a version bump, run `npm run options:dump`, commit `database/options-dump.sql` with the release changes, then create and push an unused `v<version>` tag matching `package.json`. You can also run **Release Windows** manually in GitHub Actions and enter an existing tag. GitHub-hosted runners cannot access your PC's database: they validate and package the snapshot committed at that tag. To include later database changes, export and commit a fresh snapshot for a new release.
 
