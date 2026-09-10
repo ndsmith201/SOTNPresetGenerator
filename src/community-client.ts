@@ -4,7 +4,7 @@ import type { CatalogItem, CatalogKind, CatalogPage, CommunityConfig } from "./c
 export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
   apiUrl: "https://chqxef1xt0.execute-api.us-east-1.amazonaws.com",
   region: "us-east-1",
-  clientId: "94mdfg1vrcbhl8vk97o0n3j75",
+  clientId: "1885urrsih4lpstjgbujvsei2n",
   devUser: ""
 };
 export const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
