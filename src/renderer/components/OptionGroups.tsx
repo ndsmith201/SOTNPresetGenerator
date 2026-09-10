@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { OptionActions } from "./OptionActions";
 import { createPortal } from "react-dom";
 import { OPTION_GROUPS } from "../constants";
 import type { OptionCategory, PresetOption } from "../types";
@@ -9,13 +10,19 @@ interface OptionGroupsProps {
   selected: Set<string>;
   onToggle: (id: string) => void;
   onEdit: (option: PresetOption) => void;
+  onShare: (option: PresetOption) => void;
+  onDelete: (option: PresetOption) => void;
+  readOnly?: boolean;
 }
 
-function OptionCard({ option, selected, onToggle, onEdit }: {
+function OptionCard({ option, selected, onToggle, onEdit, onShare, onDelete, readOnly }: {
   option: PresetOption;
   selected: boolean;
   onToggle: (id: string) => void;
   onEdit: (option: PresetOption) => void;
+  onShare: (option: PresetOption) => void;
+  onDelete: (option: PresetOption) => void;
+  readOnly?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -68,14 +75,14 @@ function OptionCard({ option, selected, onToggle, onEdit }: {
   return (
     <div ref={cardRef} className={`option-card${selected ? " is-selected" : ""}`}
       onMouseEnter={() => show()} onMouseLeave={leave} onPointerDown={hide}
-      onFocus={(event) => { if (event.target.matches(":focus-visible")) show(0); }}
+      onFocus={(event) => { if (event.target.matches("input:focus-visible")) show(0); }}
       onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) hide(); }}>
       <label className="option-card-label">
-        <input type="checkbox" checked={selected} aria-describedby={open ? tooltipId : undefined} onChange={() => onToggle(option.id)} />
+        <input type="checkbox" disabled={readOnly} checked={selected} aria-describedby={open ? tooltipId : undefined} onChange={() => onToggle(option.id)} />
         <span className="checkmark"><Icon name="check" /></span>
         <span className="option-copy"><strong>{option.label}</strong>{option.description && <span>{option.description}</span>}</span>
       </label>
-      <button className="option-edit-button" type="button" aria-label={`${option.source.readOnly ? "View" : "Edit"} ${option.label}`} onClick={() => { hide(); onEdit(option); }}><Icon name={option.source.readOnly ? "eye" : "pencil"} /></button>
+      {!readOnly && <OptionActions option={option} onEdit={onEdit} onShare={onShare} onDelete={onDelete} />}
       {open && createPortal(
         <div ref={tooltipRef} id={tooltipId} role="tooltip" className="option-tooltip" style={position}
           onMouseEnter={clearTimer} onMouseLeave={leave} onPointerDown={(event) => event.stopPropagation()}>
@@ -87,7 +94,7 @@ function OptionCard({ option, selected, onToggle, onEdit }: {
   );
 }
 
-export function OptionGroups({ groups, selected, onToggle, onEdit }: OptionGroupsProps) {
+export function OptionGroups({ groups, selected, onToggle, onEdit, onShare, onDelete, readOnly }: OptionGroupsProps) {
   const visibleCount = [...groups.values()].reduce((total, options) => total + options.length, 0);
   if (!visibleCount) return <div className="empty-state"><strong>No matching options</strong><span>Try another search or switch filters.</span></div>;
   return (
@@ -100,7 +107,7 @@ export function OptionGroups({ groups, selected, onToggle, onEdit }: OptionGroup
             <h3 className="group-heading" id={`group-${group.id}`}><Icon name={group.icon as IconName} />{group.label}</h3>
             <div className="option-list">
               {options.map((option) => (
-                <OptionCard key={option.id} option={option} selected={selected.has(option.id)} onToggle={onToggle} onEdit={onEdit} />
+                <OptionCard key={option.id} option={option} selected={selected.has(option.id)} onToggle={onToggle} onEdit={onEdit} onShare={onShare} onDelete={onDelete} readOnly={readOnly} />
               ))}
             </div>
           </section>

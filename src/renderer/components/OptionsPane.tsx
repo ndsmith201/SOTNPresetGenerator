@@ -15,9 +15,12 @@ interface OptionsPaneProps {
   onChange: (changes: Partial<Preset>) => void;
   onNewOption: () => void;
   onEditOption: (option: PresetOption) => void;
+  onShareOption: (option: PresetOption) => void;
+  onDeleteOption: (option: PresetOption) => void;
+  readOnly?: boolean;
 }
 
-export function OptionsPane({ preset, options, maximumComplexity, onChange, onNewOption, onEditOption }: OptionsPaneProps) {
+export function OptionsPane({ preset, options, maximumComplexity, onChange, onNewOption, onEditOption, onShareOption, onDeleteOption, readOnly }: OptionsPaneProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OptionFilter>("all");
   const selected = useMemo(() => new Set(preset.optionIds), [preset.optionIds]);
@@ -42,13 +45,13 @@ export function OptionsPane({ preset, options, maximumComplexity, onChange, onNe
   return (
     <section className="options-pane" aria-labelledby="options-title">
       <div className="pane-heading">
-        <div><span className="step-label">01 / Configure</span><h2 id="options-title">Choose options</h2><PresetNameInput name={preset.name} onSave={(name) => onChange({ name })} /></div>
+        <div><span className="step-label">{readOnly ? "Community preset" : "01 / Configure"}</span><h2 id="options-title">{readOnly ? "Preset options" : "Choose options"}</h2>{readOnly ? <p>{preset.name}</p> : <PresetNameInput name={preset.name} onSave={(name) => onChange({ name })} />}</div>
         <div className="selection-count" aria-live="polite"><strong>{selected.size}</strong><span>selected</span></div>
       </div>
-      <ComplexityControl value={preset.complexity} maximum={maximumComplexity} onChange={(complexity) => onChange({ complexity })} />
+      <fieldset className="preset-options-fieldset" disabled={readOnly}><ComplexityControl value={preset.complexity} maximum={maximumComplexity} onChange={(complexity) => onChange({ complexity })} />
       <MetaExtensionControl value={preset.metaExtension} onChange={(metaExtension) => onChange({ metaExtension })} />
       {startingRelics.length > 0 && <p className="template-starting-relics">Template starting relics: {startingRelics.join(", ")}. Included in location locks and complexity.</p>}
-      <BuiltInSettings value={preset.builtInSettings} onChange={(builtInSettings) => onChange({ builtInSettings })} />
+      <BuiltInSettings value={preset.builtInSettings} onChange={(builtInSettings) => onChange({ builtInSettings })} /></fieldset>
       <div className="option-toolbar">
         <div className="filter-tabs" role="tablist" aria-label="Option filters">
           {(["all", "selected"] as const).map((value) => <button className={`filter-tab${filter === value ? " is-active" : ""}`} type="button" key={value} onClick={() => setFilter(value)}>{value === "all" ? "All" : "Selected"}</button>)}
@@ -56,9 +59,9 @@ export function OptionsPane({ preset, options, maximumComplexity, onChange, onNe
         <label className="search-box">
           <Icon name="search" /><input id="optionSearch" type="search" aria-label="Search options" placeholder="Search options…" autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>{window.presetApp.platform === "darwin" ? "⌘ K" : "Ctrl K"}</kbd>
         </label>
-        <div className="option-toolbar-actions"><button className="text-button add-option-button" type="button" onClick={onNewOption}>+ New option</button><button className="text-button" type="button" onClick={() => onChange({ optionIds: [] })}>Clear all</button></div>
+        {!readOnly && <div className="option-toolbar-actions"><button className="text-button add-option-button" type="button" onClick={onNewOption}>+ New option</button><button className="text-button" type="button" onClick={() => onChange({ optionIds: [] })}>Clear all</button></div>}
       </div>
-      <OptionGroups groups={groups} selected={selected} onToggle={toggleOption} onEdit={onEditOption} />
+      <OptionGroups groups={groups} selected={selected} onToggle={toggleOption} onEdit={onEditOption} onShare={onShareOption} onDelete={onDeleteOption} readOnly={readOnly} />
     </section>
   );
 }

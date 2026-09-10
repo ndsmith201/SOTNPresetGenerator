@@ -1,8 +1,10 @@
+import type { UpdateApi, UpdateState } from "./update-types";
 import { contextBridge, ipcRenderer } from "electron";
 import type { SuccessfulExport } from "./renderer/export-state";
 import type { CommunityRequest, CommunityResult } from "./community-types";
 
 export interface PresetAppApi {
+  updates: UpdateApi;
   community: (request: CommunityRequest) => Promise<CommunityResult>;
   platform: NodeJS.Platform;
   version: string;
@@ -10,6 +12,7 @@ export interface PresetAppApi {
   getDefaultSotnRandoPath: () => Promise<string | null>;
   listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
+  deleteOption: (id: number) => Promise<unknown>;
   createOption: (request: {
     comment: string;
     description?: string;
@@ -46,12 +49,24 @@ export interface PresetAppApi {
 }
 
 const api: PresetAppApi = {
+  updates: {
+    getState: () => ipcRenderer.invoke("updates:state"),
+    onState: listener => {
+      const receive = (_event: Electron.IpcRendererEvent, state: UpdateState) => listener(state);
+      ipcRenderer.on("updates:state-changed", receive);
+      return () => { ipcRenderer.removeListener("updates:state-changed", receive); };
+    },
+    install: () => ipcRenderer.invoke("updates:install"),
+    restart: () => ipcRenderer.invoke("updates:restart"),
+    openDownload: () => ipcRenderer.invoke("updates:download")
+  },
   community: (request) => ipcRenderer.invoke("community:request", request),
   platform: process.platform,
   version: process.argv.find((argument) => argument.startsWith("--preset-app-version="))?.slice("--preset-app-version=".length) ?? "development",
   getPresetTemplate: () => ipcRenderer.invoke("preset:get-template") as Promise<unknown>,
   getDefaultSotnRandoPath: () => ipcRenderer.invoke("sotnrando:default-path") as Promise<string | null>,
   listInstalledPresets: (rootPath) => ipcRenderer.invoke("preset:list-installed", rootPath) as Promise<unknown>,
+  deleteOption: (id) => ipcRenderer.invoke("options:delete", id) as Promise<unknown>,
   listOptions: () => ipcRenderer.invoke("options:list") as Promise<unknown>,
   createOption: (request) => ipcRenderer.invoke("options:create", request) as Promise<unknown>,
   updateOption: (id, request) => ipcRenderer.invoke("options:update", id, request) as Promise<unknown>,

@@ -23,7 +23,7 @@ export interface CatalogItem {
 }
 export interface CatalogPage { items: CatalogItem[]; nextCursor?: string }
 export type AccountAction = "signIn" | "signUp" | "confirm" | "resend" | "forgot" | "reset" | "signOut";
-export interface AccountRequest { action: AccountAction; email?: string; password?: string; code?: string }
+export interface AccountRequest { action: AccountAction; username?: string; email?: string; password?: string; code?: string }
 export type CommunityRequest =
   | { action: "status" }
   | { action: "configure"; config: CommunityConfig }

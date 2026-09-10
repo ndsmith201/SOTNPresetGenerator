@@ -265,3 +265,24 @@ test('sharing strips local option fields and sends verified preset files; stale 
   assert.equal(stale.status, 'error'); assert.match(stale.error, /Export and build/);
   assert.equal(submitted.length, 2);
 });
+
+
+test('username registration omits email and username sign-in obtains a private session', async () => {
+  const calls = [];
+  const auth = new CommunityAuth(storage(), async (_url, init) => {
+    const action = init.headers['X-Amz-Target'].split('.').pop();
+    calls.push({ action, body: JSON.parse(init.body) });
+    return response(action === 'SignUp' ? { UserConfirmed: true } : { AuthenticationResult: { AccessToken: 'access', RefreshToken: 'refresh', ExpiresIn: 3600 } });
+  });
+  const registration = await auth.account({ action: 'signUp', username: '  castle_runner  ', password: 'ExamplePassword!1' });
+  assert.match(registration.message, /You can sign in now/);
+  assert.equal(calls[0].body.Username, 'castle_runner');
+  assert.equal(calls[0].body.UserAttributes, undefined);
+  await auth.account({ action: 'signIn', username: 'castle_runner', password: 'ExamplePassword!1' });
+  assert.deepEqual(calls[1].body.AuthParameters, { USERNAME: 'castle_runner', PASSWORD: 'ExamplePassword!1' });
+  assert.equal(auth.status().signedIn, true);
+  assert.equal(auth.status().email, 'castle_runner');
+  assert.equal(JSON.stringify(auth.status()).includes('ExamplePassword'), false);
+  await assert.rejects(auth.account({ action: 'signIn', username: '  ', password: 'test' }), /username/);
+  await assert.rejects(auth.account({ action: 'signUp', username: 'a'.repeat(129), password: 'test' }), /username/);
+});

@@ -4,7 +4,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { mkdtempSync, readFileSync, rmSync, existsSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { initializeOptionsCatalog } = require('../dist/options-database');
+const { deleteUserOption, initializeOptionsCatalog } = require('../dist/options-database');
 const { exportOptions, validateDump } = require('../scripts/export-options.cjs');
 
 const schema = readFileSync(path.join(__dirname, '../database/schema.sql'), 'utf8');
@@ -103,4 +103,18 @@ test('export fails on a missing source instead of creating or replacing data', (
 
 test('release validation rejects dumps containing unrelated tables', () => {
   assert.throws(() => validateDump(`${dump}\nCREATE TABLE private_settings (value TEXT);`), /only the options table/);
+});
+
+
+test('deleting a local option protects registered options and rejects invalid IDs', () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec(schema);
+    database.exec("INSERT INTO options (id, comment, read_only, category, type, value) VALUES (1, 'Local option', 0, 'gameplay', 'word', '1'), (2, 'Registered option', 1, 'gameplay', 'word', '2')");
+    for (const id of [0, -1, 1.5, '1', NaN, null]) assert.throws(() => deleteUserOption(database, id), /Invalid option id/);
+    assert.throws(() => deleteUserOption(database, 2), /read-only/);
+    deleteUserOption(database, 1);
+    assert.deepEqual(rows(database).map(row => row.id), [2]);
+    assert.throws(() => deleteUserOption(database, 1), /could not be found/);
+  } finally { database.close(); }
 });

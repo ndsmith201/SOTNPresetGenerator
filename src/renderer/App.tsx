@@ -1,3 +1,5 @@
+import type { UpdateState } from "../update-types";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   COMPACT_MODE_KEY,
@@ -7,6 +9,7 @@ import {
 } from "./constants";
 import { CreateOptionDialog } from "./components/CreateOptionDialog";
 import { AuthorSettingsDialog } from "./components/AuthorSettingsDialog";
+import { DeleteOptionDialog } from "./components/DeleteOptionDialog";
 import { DeletePresetDialog } from "./components/DeletePresetDialog";
 import { CreatePresetDialog } from "./components/CreatePresetDialog";
 import { PresetEditor } from "./components/PresetEditor";
@@ -19,7 +22,13 @@ import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTempl
 import type { CreateOptionInput, DatabaseOption, InstalledPreset, JsonObject, Preset, PresetOption } from "./types";
 import { selectTemplateOptions } from "./template-options";
 import { exportMatchesCurrent, type SuccessfulExport } from "./export-state";
-import { CommunityDialog } from "./components/CommunityDialog";
+import type { CatalogItem, CommunityStatus } from "../community-types";
+import { communityRequest, subscribeCommunityStatus } from "./community-api";
+import { communityItemName } from "./components/CommunityPresets";
+import { LoginDialog } from "./components/LoginDialog";
+import { ShareDialog } from "./components/ShareDialog";
+import { Icon } from "./components/Icon";
+import { JsonPreview } from "./components/JsonPreview";
 
 async function fetchOptions(): Promise<PresetOption[]> {
   const response = await window.presetApp.listOptions();
@@ -30,6 +39,8 @@ async function fetchOptions(): Promise<PresetOption[]> {
 }
 
 export function App() {
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [options, setOptions] = useState<PresetOption[]>([]);
   const [template, setTemplate] = useState<JsonObject | null>(null);
@@ -37,11 +48,21 @@ export function App() {
   const [initialized, setInitialized] = useState(false);
   const [createPresetOpen, setCreatePresetOpen] = useState(false);
   const [createOptionOpen, setCreateOptionOpen] = useState(false);
+  const [optionToDelete, setOptionToDelete] = useState<PresetOption | null>(null);
   const [editingOption, setEditingOption] = useState<DatabaseOption | null>(null);
   const [authorSettingsOpen, setAuthorSettingsOpen] = useState(false);
-  const [communityOpen, setCommunityOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [communityItem, setCommunityItem] = useState<CatalogItem | null>(null);
+  const [communityBusy, setCommunityBusy] = useState(false);
+  const communityPending = useRef(false);
+  const [communityError, setCommunityError] = useState("");
+  const [votes, setVotes] = useState<Record<string, number>>({});
+  const [shareTarget, setShareTarget] = useState<PresetOption | "preset" | null>(null);
+  const afterLogin = useRef<(() => void) | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
   const [author, setAuthor] = useState(() => localStorage.getItem(PRESET_AUTHOR_KEY) ?? "");
+  const [signedInUsername, setSignedInUsername] = useState<string | null>(null);
+  const effectiveAuthor = signedInUsername ?? author;
   const [exporting, setExporting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [successfulExports, setSuccessfulExports] = useState<Record<string, SuccessfulExport>>({});
@@ -65,6 +86,19 @@ export function App() {
   }, []);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    let receivedEvent = false;
+    let canceled = false;
+    const unsubscribe = window.presetApp.updates.onState(state => { receivedEvent = true; setUpdateState(state); });
+    void window.presetApp.updates.getState().then(state => { if (!canceled && !receivedEvent) setUpdateState(state); }).catch(() => {});
+    return () => { canceled = true; unsubscribe(); };
+  }, []);
+  useEffect(() => {
+    const unsubscribe = subscribeCommunityStatus(status => setSignedInUsername(status.signedIn ? status.email : null));
+    // Restore the saved session's author without requiring the login dialog.
+    void communityRequest<CommunityStatus>({ action: "status" }).catch(() => {});
+    return unsubscribe;
+  }, []);
   useEffect(() => {
     let canceled = false;
     void window.presetApp.getDefaultSotnRandoPath().then((directory) => {
@@ -137,12 +171,62 @@ export function App() {
   const activePreset = useMemo(() => presets.find((preset) => preset.id === activePresetId) ?? null, [activePresetId, presets]);
   const optionLabels = useMemo(() => new Map(options.map((option) => [option.id, option.label])), [options]);
   const maximumComplexity = useMemo(() => calculatePresetMaxComplexity(template, activePreset, options), [template, options, activePreset?.baseTemplate, activePreset?.metaExtension, activePreset?.optionIds]);
-  const preview = useMemo(() => buildPreviewPreset(template, activePreset, options, author, maximumComplexity), [activePreset, options, template, author, maximumComplexity]);
+  const preview = useMemo(() => buildPreviewPreset(template, activePreset, options, effectiveAuthor, maximumComplexity), [activePreset, options, template, effectiveAuthor, maximumComplexity]);
   const boundedComplexity = normalizeComplexity(activePreset?.complexity, maximumComplexity);
   const previewJson = useMemo(() => preview ? JSON.stringify(preview) : "", [preview]);
   const exportKey = JSON.stringify([exportPath, presetIdFromName(activePreset?.name ?? "")]);
   const currentExport = successfulExports[exportKey];
   const canGenerate = Boolean(preview && exportMatchesCurrent(currentExport, activePresetId, exportPath, previewJson));
+  const communityPreset = useMemo(() => communityItem?.kind === "presets" ? createPresetFromTemplate(communityItemName(communityItem), communityItem.data, options) : null, [communityItem, options]);
+
+  const showLibrary = () => { setActivePresetId(null); setCommunityItem(null); setCommunityError(""); };
+  const requireLogin = async (next: () => void) => {
+    try {
+      const status = await communityRequest<CommunityStatus>({ action: "status" });
+      if (status.signedIn) next();
+      else { afterLogin.current = next; setLoginOpen(true); }
+    } catch (cause) { showToast(cause instanceof Error ? cause.message : "Unable to check login."); }
+  };
+  const requestShare = (target: PresetOption | "preset") => {
+    if (target === "preset" && !preview) { showToast("The preset preview is still loading"); return; }
+    void requireLogin(() => setShareTarget(target));
+  };
+  const viewCommunity = (item: CatalogItem) => {
+    setActivePresetId(null); setCommunityItem(item); setCommunityError("");
+    void communityRequest<CatalogItem>({ action: "get", kind: item.kind, id: item.id }).then(fresh => {
+      setCommunityItem(current => current?.id === item.id && current.kind === item.kind ? fresh : current);
+    }).catch(cause => showToast(cause instanceof Error ? cause.message : "Unable to refresh preset."));
+  };
+  const vote = (value: -1 | 0 | 1) => {
+    const item = communityItem;
+    if (!item || communityPending.current) return;
+    void requireLogin(() => {
+      if (communityPending.current) return;
+      communityPending.current = true; setCommunityBusy(true); setCommunityError("");
+      void communityRequest<CatalogItem>({ action: "vote", kind: item.kind, id: item.id, value }).then(fresh => {
+        setCommunityItem(current => current?.id === item.id && current.kind === item.kind ? fresh : current);
+        setVotes(current => ({ ...current, [`${item.kind}:${item.id}`]: value }));
+      }).catch(cause => setCommunityError(cause instanceof Error ? cause.message : "Unable to save vote."))
+        .finally(() => { communityPending.current = false; setCommunityBusy(false); });
+    });
+  };
+  const importCommunity = async () => {
+    if (!communityItem || communityPending.current) return;
+    if (!initialized) { showToast("The option catalog is still loading"); return; }
+    if (communityItem.kind === "presets") {
+      const preset = createPresetFromTemplate(communityItemName(communityItem).slice(0, 60), communityItem.data, options);
+      setPresets(current => [...current, preset]); setActivePresetId(preset.id); setCommunityItem(null);
+      showToast("Community preset copied to your local drafts");
+      return;
+    }
+    communityPending.current = true; setCommunityBusy(true); setCommunityError("");
+    try {
+      const result = await communityRequest<{ alreadyImported: boolean }>({ action: "importOption", kind: "options", id: communityItem.id });
+      setOptions(await fetchOptions());
+      showToast(result.alreadyImported ? "This option is already in your catalog" : "Option added to your catalog");
+    } catch (cause) { setCommunityError(cause instanceof Error ? cause.message : "Unable to import option."); }
+    finally { communityPending.current = false; setCommunityBusy(false); }
+  };
 
   const saveAuthor = (value: string) => {
     setAuthor(value);
@@ -175,6 +259,7 @@ export function App() {
     if (fileName && !source) { showToast("The selected template is unavailable"); return; }
     const preset = createPresetFromTemplate(name, source?.json, options);
     setPresets((current) => [...current, preset]);
+    setCommunityItem(null);
     setActivePresetId(preset.id);
     setCreatePresetOpen(false);
     setInitialTemplate("");
@@ -213,9 +298,10 @@ export function App() {
         setSuccessfulExports((current) => ({ ...current, [key]: exported }));
         showToast(`Exported and built ${result.path.split(/[\\/]/).pop() ?? "preset file"}`);
         setInstalledRevision((value) => value + 1);
+        return exported;
       }
       else if (result.status === "error" && typeof result.error === "string") throw new Error(result.error);
-    } catch (error) { showToast(error instanceof Error ? error.message : "Export failed"); }
+    } catch (error) { showToast(error instanceof Error ? error.message : "Export failed"); throw error; }
     finally { operationPending.current = false; setExporting(false); }
   };
 
@@ -258,6 +344,18 @@ export function App() {
     showToast(editingOption ? "Option updated" : "Option added");
   };
 
+  const deleteOption = async () => {
+    if (!optionToDelete) return;
+    const result = await window.presetApp.deleteOption(optionToDelete.source.id);
+    if (!isJsonObject(result) || result.status !== "deleted") throw new Error(isJsonObject(result) && typeof result.error === "string" ? result.error : "Unable to delete option.");
+    const deletedId = optionToDelete.id;
+    setOptions(current => current.filter(option => option.id !== deletedId));
+    // Retain template matches so deselected inherited writes stay disabled.
+    setPresets(current => current.map(preset => preset.optionIds.includes(deletedId) ? { ...preset, optionIds: preset.optionIds.filter(id => id !== deletedId), updatedAt: new Date().toISOString() } : preset));
+    setOptionToDelete(null);
+    showToast("Option deleted");
+  };
+
   const closeOptionDialog = () => {
     setCreateOptionOpen(false);
     setEditingOption(null);
@@ -269,9 +367,17 @@ export function App() {
     showToast("Copied to clipboard");
   };
 
+  const updateOpen = Boolean(initialized && !updateDismissed && updateState?.release && ["available", "downloading", "ready", "restarting", "error"].includes(updateState.phase)
+    && !exporting && !generating && !communityBusy && !createPresetOpen && !createOptionOpen && !authorSettingsOpen && !loginOpen && !shareTarget && !presetToDelete && !optionToDelete && !viewingInstalled);
+  const restartForUpdate = useCallback(async () => {
+    persistPresets(presets);
+    const result = await window.presetApp.updates.restart();
+    if (result.status === "error") throw new Error(result.error);
+  }, [presets]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (communityOpen) return;
+      if (loginOpen || shareTarget || communityItem || optionToDelete || updateOpen) return;
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
       if (key === "n") { event.preventDefault(); setCreatePresetOpen(true); }
@@ -280,29 +386,53 @@ export function App() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [activePreset, communityOpen, showToast]);
+  }, [activePreset, loginOpen, shareTarget, communityItem, optionToDelete, updateOpen, showToast]);
+
+  const share = async () => {
+    if (!shareTarget) return;
+    const account = await communityRequest<CommunityStatus>({ action: "status" });
+    if (!account.signedIn) { setLoginOpen(true); throw new Error("Sign in to share, then confirm again."); }
+    let item: CatalogItem;
+    if (shareTarget === "preset") {
+      const built = canGenerate ? currentExport : await exportPreset();
+      if (!built) throw new Error("Export and build the preset to continue sharing.");
+      item = await communityRequest<CatalogItem>({ action: "sharePreset", buildToken: built.buildToken });
+    } else {
+      item = await communityRequest<CatalogItem>({ action: "shareOption", localId: shareTarget.source.id });
+    }
+    setShareTarget(null); showToast(`Shared “${communityItemName(item)}” with the community`);
+  };
+  const communityVote = communityItem ? votes[`${communityItem.kind}:${communityItem.id}`] : undefined;
+  const communityActions = communityItem && <>
+    <button className="button button-primary" disabled={communityBusy || !initialized} onClick={() => void importCommunity()}>{communityItem.kind === "presets" ? "Use as template" : "Add to my options"}</button>
+    <div className="preset-votes" aria-label="Community votes">
+      <button className="button button-ghost button-with-icon" disabled={communityBusy} aria-label={`Upvote, ${communityItem.upvotes} upvotes`} aria-pressed={communityVote === 1} onClick={() => vote(communityVote === 1 ? 0 : 1)}><Icon name="thumb-up" />{communityItem.upvotes}</button>
+      <button className="button button-ghost button-with-icon" disabled={communityBusy} aria-label={`Downvote, ${communityItem.downvotes} downvotes`} aria-pressed={communityVote === -1} onClick={() => vote(communityVote === -1 ? 0 : -1)}><Icon name="thumb-down" />{communityItem.downvotes}</button>
+      <button className="text-button" disabled={communityBusy} onClick={() => vote(0)}>Remove my vote</button>
+    </div>
+  </>;
 
   return (
     <>
       <div className="app-shell">
-        <WindowBar onCommunity={() => setCommunityOpen(true)} editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={() => setActivePresetId(null)} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
-        <TopBar editing={Boolean(activePreset)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={() => setActivePresetId(null)} onExport={() => void exportPreset()} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
-        {activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onCopy={() => void copyPreview()} /> : <PresetLibrary presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
+        <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
+        <TopBar communityActions={communityActions} onShare={() => requestShare("preset")} editing={Boolean(activePreset || communityItem)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={showLibrary} onExport={() => { void exportPreset().catch(() => {}); }} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
+        {communityItem ? <div className="community-preset-view">
+          {communityError && <p className="community-error" role="alert">{communityError}</p>}
+          {communityPreset ? <PresetEditor key={communityItem.id} readOnly preset={communityPreset} maximumComplexity={Math.max(communityPreset.complexity, calculatePresetMaxComplexity(template, communityPreset, options))} options={options.filter(option => communityPreset.optionIds.includes(option.id))} preview={communityItem.data} onChange={() => {}} onNewOption={() => {}} onEditOption={() => {}} onShareOption={() => {}} onDeleteOption={() => {}} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied community JSON"), () => showToast("Unable to copy JSON")); }} /> : <main className="workspace"><section className="options-pane"><span className="step-label">Community option</span><h2>{communityItemName(communityItem)}</h2><p>{String(communityItem.data.description || "Shared with the community")}</p></section><JsonPreview community preview={communityItem.data} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied option JSON"), () => showToast("Unable to copy JSON")); }} /></main>}
+          {communityItem.kind === "presets" && <p className="community-template-note">Use as template to edit a local copy. The editor rebuilds location rules and does not resolve inherited presets; review the resulting JSON before exporting.</p>}
+        </div> : activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onShareOption={requestShare} onDeleteOption={setOptionToDelete} onCopy={() => void copyPreview()} /> : <PresetLibrary onViewCommunity={viewCommunity} presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
       <InstalledPresetDialog preset={viewingInstalled} onClose={() => setViewingInstalled(null)} onCreate={(preset) => { setViewingInstalled(null); setInitialTemplate(preset.fileName); setCreatePresetOpen(true); }} onCopy={(preset) => { void navigator.clipboard.writeText(JSON.stringify(preset.json, null, 2)).then(() => showToast("Copied installed JSON"), () => showToast("Unable to copy JSON")); }} />
       <CreateOptionDialog open={createOptionOpen} option={editingOption} onClose={closeOptionDialog} onSubmit={saveOption} />
       <AuthorSettingsDialog open={authorSettingsOpen} author={author} onClose={() => setAuthorSettingsOpen(false)} onSave={saveAuthor} />
       <DeletePresetDialog preset={presetToDelete} onClose={() => setPresetToDelete(null)} onDelete={deletePreset} />
+      {optionToDelete && <DeleteOptionDialog option={optionToDelete} onClose={() => setOptionToDelete(null)} onDelete={deleteOption} />}
       <Toast message={toast} />
-      {communityOpen && <CommunityDialog options={options} presetName={activePreset?.name ?? ""} preview={preview} buildToken={canGenerate && !exporting && !generating ? currentExport?.buildToken : undefined}
-        onClose={() => setCommunityOpen(false)} onOptionsImported={async () => setOptions(await fetchOptions())}
-        onPresetImported={(name, json) => {
-          if (!initialized) throw new Error("The local option catalog is still loading.");
-          const preset = createPresetFromTemplate(name, json, options);
-          setPresets(current => [...current, preset]); setActivePresetId(preset.id); setCommunityOpen(false);
-          showToast("Community preset copied to your local drafts");
-        }} />}
+      {updateOpen && updateState && <UpdateDialog state={updateState} onLater={() => setUpdateDismissed(true)} onRestart={restartForUpdate} />}
+      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : Object.fromEntries(Object.entries(shareTarget.source).filter(([key]) => key !== "id" && key !== "readOnly"))} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
+      {loginOpen && <LoginDialog onClose={() => { setLoginOpen(false); setVotes({}); afterLogin.current = null; }} onSignedIn={() => { setLoginOpen(false); setVotes({}); const next = afterLogin.current; afterLogin.current = null; next?.(); }} />}
     </>
   );
 }

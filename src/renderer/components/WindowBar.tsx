@@ -19,7 +19,7 @@ interface WindowBarProps {
 }
 
 export function WindowBar(props: WindowBarProps) {
-  const [openMenu, setOpenMenu] = useState<"file" | "settings" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"file" | "settings" | "community" | null>(null);
   const menuRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -37,7 +37,12 @@ export function WindowBar(props: WindowBarProps) {
   return (
     <div className="window-bar">
       <nav className="app-menu" aria-label="Application menu" ref={menuRef}>
-        <button className="menu-trigger" type="button" onClick={() => act(props.onCommunity)}>Community</button>
+        <div className="menu-root">
+          <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "community"} onClick={() => setOpenMenu(openMenu === "community" ? null : "community")}>Community</button>
+          <div className="menu-popover" role="menu" hidden={openMenu !== "community"}>
+            <button type="button" role="menuitem" onClick={() => act(props.onCommunity)}>Login</button>
+          </div>
+        </div>
         <div className="menu-root">
           <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "file"} onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}>File</button>
           <div className="menu-popover" role="menu" hidden={openMenu !== "file"}>

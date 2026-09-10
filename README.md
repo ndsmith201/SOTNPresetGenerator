@@ -40,19 +40,29 @@ Windows x64 installer and ZIP builds are distributed through this repository's [
 
 Screenshots below show the current interface with example drafts and the bundled option catalog. The installed **Example base** preset is demonstration data; your installed list comes from your configured repository.
 
+## Startup updates
+
+Packaged Windows builds check the public GitHub repository for a newer stable release at startup. If one is available, a dialog offers **Update and restart** or **Later**. The installer version downloads only after approval, saves local presets, and restarts through Electron's Squirrel updater when the update is ready. Settings, options, exported presets, and securely stored login sessions remain in their existing data locations.
+
+The check is quiet when offline, rate-limited, or already up to date. Development runs do not check. A declined update is offered again on the next startup. The initial launch after installation waits ten seconds for the installer lock to clear. Update prompts wait for active editing dialogs, exports, and patch generation to finish.
+
+Portable ZIP copies offer **Download update** instead of attempting to replace a running portable app. Installing the Windows Setup executable enables automatic installation and restart. Releases must include the matching architecture's Setup executable, `RELEASES`, and the full `.nupkg`; the Windows release workflow already publishes these assets. Keep each release's Squirrel feed specific to its architecture (the current workflow publishes x64).
+
+The update feed is pinned to the approved release in this repository. See the [Electron updater documentation](https://www.electronjs.org/docs/latest/api/auto-updater/) for the Squirrel installation lifecycle. Updates cannot be delivered to older app versions that do not yet include this startup updater; install the first release containing it manually.
+
 ## Community catalog
 
-Open **Community** in the application menu to browse shared **Presets** and **Options** from SOTNPresetAPI. The public deployment is configured automatically. Community access requires an internet connection; local drafts, options, exports, and patch generation continue to work offline.
+Community presets appear alongside your drafts in the main preset library, using matching cards with a heart and upvote count. Community options are available in the same library. The public deployment is configured automatically. Community access requires an internet connection; local editing, exports, and patch generation continue to work offline.
 
-- Select an item to inspect its JSON and vote totals. **Load more** follows the API's page cursor, including empty pages that have more results. Search filters the items already loaded; catalog order is by ID, not score.
-- **Add to my options** imports an option into the local catalog with a new numeric ID. Its community ID is tracked separately, so importing the same item again reuses the local option and preserves any local edits.
-- **Use as template** creates an editable local preset. As with installed templates, the editor replaces location rules and does not resolve inherited presets. **Copy JSON** copies the community item's original configuration.
-- Open **Share** to submit a local option or the currently open preset. Presets must first be exported and built with their current changes. Review the JSON and click **Share publicly** to submit. Local option IDs and read-only flags are excluded; presets use the verified exported file. Submissions are limited to 128 KiB. Each submission creates a new entry, so uncertain failures are not retried automatically.
-- Signed-in users can **Upvote**, **Downvote**, or **Remove my vote**. Each account has one vote per item. Totals refresh after a vote; the API does not return your existing personal vote when browsing.
+- Open a community preset to view its original JSON and recognized options in the preset screen. The top-right thumbs-up and thumbs-down buttons show the vote totals. Clicking your selected vote again removes it; **Remove my vote** also clears votes from earlier sessions, since the API does not return your existing personal vote.
+- **Use as template** creates an editable local copy. The editor rebuilds location rules and does not resolve inherited presets, so review the resulting JSON before exporting. **Copy JSON** in the community view copies the original submission.
+- Open a community option and choose **Add to my options** to import it. Repeated imports reuse the existing local option and preserve local edits.
+- Share your current preset using **Share** in the top right. Option cards have an actions menu: View for bundled options, and Edit, Share, and Delete for local options. Deleting a local option asks for confirmation and removes it from saved preset selections. Both open a confirmation dialog with optional JSON review; canceling publishes nothing. Presets are exported and built with their current changes before submission when needed. Option IDs and read-only flags are excluded. Each submission creates a new public entry, and uncertain failures are not retried automatically.
+- **Load more** follows the API page cursor, including empty pages with more results. Search filters loaded items; catalog order is by ID, not vote count.
 
-Browsing and importing are public. **Sign in** also offers account creation, email confirmation, resending confirmation codes, and password recovery. Passwords are never saved. Access tokens stay in the Electron main process; refresh tokens are encrypted using the operating system's secure storage and saved in the local database. If secure storage is unavailable, sign-in lasts only for the current session. Signing out removes the saved session on this device. Additional Cognito challenges such as MFA are not currently supported.
+**Community → Login** opens a compact dialog with **Sign in** and **Sign up** tabs. Sign in with a username and password; sign up adds a confirm-password field. Sharing or voting while signed out opens this dialog and resumes the requested action after sign-in (sharing still requires confirmation). The username-based Cognito deployment automatically confirms new accounts. Other deployments must support username sign-up and account confirmation; no email or code entry is included in this UI. Password recovery requires a community administrator.
 
-**Account → Connection settings** lets you choose another deployment's API URL, Cognito region, and public app client ID. Saving connection settings signs you out. HTTPS is required except for loopback development URLs; a development identity sends `X-Dev-User` only to a localhost API. **Check saved connection** checks `/healthz`. The default deployment configuration comes from the API project's Bruno AWS environment, and the integration follows its `openai.json` OpenAPI contract.
+Passwords are never saved. Access tokens remain in the Electron main process; refresh tokens are encrypted with operating-system secure storage. If secure storage is unavailable, sign-in lasts only for the current app session. Open **Community → Login** while signed in to sign out. Additional Cognito challenges such as MFA are not currently supported.
 
 Community account settings and import mappings are local and excluded from release option dumps. Responses with integers that JavaScript cannot represent exactly are rejected instead of silently changing their values.
 
@@ -209,7 +219,7 @@ The button reads **Building…** while export is running. A successful export re
 | Compact option cards | Uses denser cards to show more options in the list. |
 | Wrap JSON lines | Wraps long lines in the JSON display. |
 | Export directory | Remembers the SOTNRando root used for installed presets and export. |
-| Preset author | Overrides the author in all generated presets, including existing drafts. Leave blank to use the template author. |
+| Preset author | Adds the signed-in username to generated preset authors. When signed out, uses the name saved here; leave it blank to keep only the template authors. The saved setting is preserved when signing in or out. |
 
 | Shortcut | Action |
 | --- | --- |

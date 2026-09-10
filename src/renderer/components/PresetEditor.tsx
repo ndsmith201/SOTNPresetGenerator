@@ -10,14 +10,17 @@ interface PresetEditorProps {
   onChange: (changes: Partial<Preset>) => void;
   onNewOption: () => void;
   onEditOption: (option: PresetOption) => void;
+  onShareOption: (option: PresetOption) => void;
+  onDeleteOption: (option: PresetOption) => void;
+  readOnly?: boolean;
   onCopy: () => void;
 }
 
 export function PresetEditor(props: PresetEditorProps) {
   return (
     <main className="workspace">
-      <OptionsPane preset={props.preset} options={props.options} maximumComplexity={props.maximumComplexity} onChange={props.onChange} onNewOption={props.onNewOption} onEditOption={props.onEditOption} />
-      <JsonPreview preview={props.preview} onCopy={props.onCopy} />
+      <OptionsPane preset={props.preset} options={props.options} maximumComplexity={props.maximumComplexity} onChange={props.onChange} onNewOption={props.onNewOption} onEditOption={props.onEditOption} onShareOption={props.onShareOption} onDeleteOption={props.onDeleteOption} readOnly={props.readOnly} />
+      <JsonPreview community={props.readOnly} preview={props.preview} onCopy={props.onCopy} />
     </main>
   );
 }

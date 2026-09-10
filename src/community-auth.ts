@@ -99,8 +99,9 @@ export class CommunityAuth {
     if (!isRecord(request)) throw new Error("Invalid account request.");
     if (request.action === "signOut") { this.signOut(); return { message: "Signed out on this device.", account: this.status() }; }
     if (this.config.devUser) throw new Error("Remove the development identity in Connection settings to use an account.");
-    const email = typeof request.email === "string" ? request.email.trim() : "";
-    if (!email || email.length > 320) throw new Error("Enter your email address.");
+    // Keep email requests compatible with saved accounts and older clients.
+    const email = typeof request.username === "string" ? request.username.trim() : typeof request.email === "string" ? request.email.trim() : "";
+    if (!email || email.length > (request.username !== undefined ? 128 : 320)) throw new Error("Enter a valid username.");
     const password = typeof request.password === "string" ? request.password : "";
     const code = typeof request.code === "string" ? request.code.trim() : "";
     if (["signIn", "signUp", "reset"].includes(request.action) && (!password || password.length > 256)) throw new Error("Enter a password of at most 256 characters.");
@@ -114,8 +115,8 @@ export class CommunityAuth {
         break;
       }
       case "signUp": {
-        const result = await this.cognito("SignUp", { Username: email, Password: password, UserAttributes: [{ Name: "email", Value: email }] });
-        message = result.UserConfirmed ? "Account created. You can sign in now." : "Account created. Check your email and choose Confirm email to enter the code.";
+        const result = await this.cognito("SignUp", { Username: email, Password: password, ...(request.username === undefined ? { UserAttributes: [{ Name: "email", Value: email }] } : {}) });
+        message = result.UserConfirmed ? "Account created. You can sign in now." : request.username !== undefined ? "Account created. This service requires account confirmation before you can sign in. Contact the community administrator to confirm your account." : "Account created. Check your email and choose Confirm email to enter the code.";
         break;
       }
       case "confirm":

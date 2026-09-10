@@ -1,9 +1,12 @@
+import type { CatalogItem } from "../../community-types";
+import { CommunityPresets } from "./CommunityPresets";
 import type { InstalledPreset, Preset } from "../types";
 import { formatUpdatedDate } from "../preset-utils";
 import { Icon } from "./Icon";
 
 interface PresetLibraryProps {
   presets: Preset[];
+  onViewCommunity: (item: CatalogItem) => void;
   optionLabels: Map<string, string>;
   onCreate: () => void;
   onOpen: (preset: Preset) => void;
@@ -16,7 +19,7 @@ interface PresetLibraryProps {
   onRefreshInstalled: () => void;
 }
 
-export function PresetLibrary({ presets, optionLabels, onCreate, onOpen, onDelete, installedPresets, installedConfigured, installedLoading, installedMessage, onViewInstalled, onRefreshInstalled }: PresetLibraryProps) {
+export function PresetLibrary({ onViewCommunity, presets, optionLabels, onCreate, onOpen, onDelete, installedPresets, installedConfigured, installedLoading, installedMessage, onViewInstalled, onRefreshInstalled }: PresetLibraryProps) {
   const ordered = [...presets].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return (
     <main className="preset-library">
@@ -48,6 +51,8 @@ export function PresetLibrary({ presets, optionLabels, onCreate, onOpen, onDelet
           <button className="button button-primary" type="button" onClick={onCreate}>Create a preset</button>
         </div>
       )}
+      <CommunityPresets onOpen={onViewCommunity} />
+      <CommunityPresets kind="options" onOpen={onViewCommunity} />
       {installedConfigured && <section className="installed-presets" aria-labelledby="installed-presets-title">
         <div className="library-heading">
           <div><span className="step-label">SOTNRando · Read-only</span><h2 id="installed-presets-title">Installed presets</h2><p>View installed JSON or use it as a template for a new preset.</p></div>

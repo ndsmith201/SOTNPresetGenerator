@@ -121,3 +121,12 @@ function migrateOptionalWriteFields(database: DatabaseSync): void {
   }
 }
 
+
+/** Delete only editable local options; bundled catalog entries are protected. */
+export function deleteUserOption(database: DatabaseSync, id: unknown): void {
+  if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1) throw new Error("Invalid option id.");
+  const option = database.prepare("SELECT read_only FROM options WHERE id = ?").get(id);
+  if (!option) throw new Error("The option could not be found.");
+  if (option.read_only) throw new Error("This registered option is read-only.");
+  database.prepare("DELETE FROM options WHERE id = ? AND read_only = 0").run(id);
+}

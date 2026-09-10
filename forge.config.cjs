@@ -12,6 +12,7 @@ const [owner, name] = (process.env.GITHUB_REPOSITORY || 'ndsmith201/SOTNPresetGe
 // Allow only runtime inputs. In particular, out/ contains local database
 // backups, and dist/ may contain development screenshots and test reports.
 const runtimeFiles = new Set([
+  '/dist/app-updater.js', '/dist/update-types.js',
   '/dist/community-client.js', '/dist/community-auth.js', '/dist/community-service.js', '/dist/community-types.js',
   '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js', '/dist/bundled-randomizer.js', '/dist/preset-generation.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
