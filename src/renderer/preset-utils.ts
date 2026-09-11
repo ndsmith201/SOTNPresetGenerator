@@ -20,7 +20,7 @@ import type {
 } from "./types";
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
-import { selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
+import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -466,8 +466,23 @@ export function buildPreviewPreset(
   const gameInit = additions.flatMap((option) => structuredClone(option.gameInitWrites));
   const appended = additions.flatMap((option) => structuredClone(option.appendedWrites));
   const returnIndex = templateWrites.findIndex(isReturnJump);
-  const gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);
-  if (gameInitAnchorIndex >= 0 && (returnIndex < 0 || gameInitAnchorIndex < returnIndex)) {
+  let gameInitAnchorIndex = templateWrites.findIndex((write, index) =>
+    isGameInitAnchor(write) && (returnIndex < 0 || index < returnIndex)
+  );
+  const selectedGameInit = selected.filter((option) => option.gameInitWrites.length > 0);
+  if (gameInitAnchorIndex < 0 && selectedGameInit.length > 0) {
+    // Installed presets may only initialize the relic bank (0x8009). Restore
+    // the game bank before both new and already-inherited game init writes.
+    const inheritedIndices = matchTemplateOptions({ writes: templateWrites }, selectedGameInit)
+      .flatMap((match) => match.writeIndices)
+      .filter((index) => returnIndex < 0 || index < returnIndex);
+    gameInitAnchorIndex = inheritedIndices.length > 0 ? Math.min(...inheritedIndices)
+      : returnIndex < 0 ? templateWrites.length : returnIndex;
+    templateWrites.splice(gameInitAnchorIndex, 0, {
+      type: "word", value: "0x3c038004", comment: "lui v1, 0x8004"
+    });
+  }
+  if (gameInitAnchorIndex >= 0) {
     templateWrites.splice(gameInitAnchorIndex, 0, ...injected);
     const shiftedAnchorIndex = gameInitAnchorIndex + injected.length;
     templateWrites.splice(shiftedAnchorIndex + 1, 0, ...gameInit);
@@ -475,7 +490,7 @@ export function buildPreviewPreset(
     templateWrites.splice(returnIndex < 0 ? templateWrites.length : returnIndex, 0, ...injected, ...gameInit);
   }
   // Never split the return jump from its delay slot or put option writes after it.
-  const finalReturnIndex = returnIndex < 0 ? -1 : returnIndex + injected.length + gameInit.length;
+  const finalReturnIndex = templateWrites.findIndex(isReturnJump);
   const firstAddressedPatch = appended.findIndex((write) => write.address !== undefined);
   if (finalReturnIndex >= 0 && firstAddressedPatch >= 0 && templateWrites[finalReturnIndex].address === undefined) {
     // Addressed patches change the implicit write cursor. Resume the injected

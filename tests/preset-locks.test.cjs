@@ -98,9 +98,10 @@ test("a game-init anchor after the return cannot put option writes past the retu
   const options = [option("all", "All", { injectedWrites: [{ comment: "Relic" }],
     gameInitWrites: [{ comment: "Init" }], appendedWrites: [{ comment: "Patch" }] })];
   assert.deepEqual(preview({ writes: tail }, options).writes, [
-    { comment: "Relic" }, { comment: "Init" }, { comment: "Patch" }, ...tail
+    { comment: "Relic" }, { type: "word", value: "0x3c038004", comment: "lui v1, 0x8004" },
+    { comment: "Init" }, { comment: "Patch" }, ...tail
   ]);
-  assert.deepEqual(preview({}, options).writes.map((write) => write.comment), ["Relic", "Init", "Patch"]);
+  assert.deepEqual(preview({}, options).writes.map((write) => write.comment), ["Relic", "lui v1, 0x8004", "Init", "Patch"]);
 });
 
 test("removes all selected relics from every combination using exact names", () => {
