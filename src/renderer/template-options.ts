@@ -23,7 +23,7 @@ function byteString(value: unknown): unknown {
     ? (value.match(/[\da-f]{2}/gi) ?? []).map((byte) => parseInt(byte, 16)) : value;
 }
 
-function writeLocations(writes: WriteEntry[]): { address: number | undefined; startup: boolean }[] {
+export function writeLocations(writes: WriteEntry[]): { address: number | undefined; startup: boolean }[] {
   let address: number | undefined;
   let startup = false;
   let delaySlot = false;
