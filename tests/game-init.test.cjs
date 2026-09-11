@@ -31,6 +31,24 @@ test("default generation keeps the anchor between relic grants and game init wri
   assert.deepEqual(template, original);
 });
 
+test("presets with missing or empty writes copy the default routine before applying options", () => {
+  const originalTemplate = structuredClone(template);
+  for (const writes of [undefined, [], null]) {
+    const source = { music: true, ...(writes === undefined ? {} : { writes }) };
+    const originalSource = structuredClone(source);
+    const withoutOptions = generate(source, []);
+    assert.deepEqual(withoutOptions.writes, template.writes);
+    assert.equal(withoutOptions.music, true);
+    const withOptions = generate(source);
+    assert.deepEqual(withOptions.writes, generate().writes);
+    assert.ok(detectStartingRelics(withOptions).has("Soul of Bat"));
+    assert.deepEqual(generate(withOptions).writes, withOptions.writes);
+    withoutOptions.writes[0].value = "changed";
+    assert.deepEqual(template, originalTemplate);
+    assert.deepEqual(source, originalSource);
+  }
+});
+
 test("installed presets without an anchor initialize the game bank before new game init options", () => {
   const source = { writes: template.writes.filter((write) => Number(write.value) !== 0x3c038004) };
   const original = structuredClone(source);
@@ -73,4 +91,31 @@ test("reopening an affected preset restores the anchor before inherited game ini
   assert.equal(output.writes.length, source.writes.length + shortcuts.gameInitWrites.length + 1);
   assert.deepEqual(source, original);
   assert.deepEqual(generate(output).writes, output.writes);
+});
+
+test("restoring a missing or late anchor preserves the return address around addressed patches", () => {
+  const [patch] = toPresetOptions([
+    { id: 4, comment: "Regular patch", category: "world", type: "word", value: "0x12345678", address: "0x1000",
+      additionalWrites: [{ type: "word", value: "0x12345679" }] }
+  ]);
+  const catalog = [...options, patch];
+  for (const lateAnchor of [false, true]) {
+    const source = { writes: [
+      ...template.writes.filter((write) => Number(write.value) !== 0x3c038004),
+      ...(lateAnchor ? [template.writes[3]] : [])
+    ] };
+    const original = structuredClone(source);
+    const preset = createPresetFromTemplate("Patched game init", source, catalog);
+    preset.optionIds = catalog.map((option) => option.id);
+    const output = buildPreviewPreset(template, preset, catalog);
+    assert.deepEqual(output.writes.slice(3), [
+      ...bat.injectedWrites, template.writes[3], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites,
+      ...patch.appendedWrites, { ...template.writes.at(-2), address: "0x00158cb8" }, template.writes.at(-1),
+      ...(lateAnchor ? [template.writes[3]] : [])
+    ]);
+    assert.ok(detectStartingRelics(output).has("Soul of Bat"));
+    assert.deepEqual(source, original);
+    const reopened = createPresetFromTemplate("Patched game init", output, catalog);
+    assert.deepEqual(buildPreviewPreset(template, reopened, catalog).writes, output.writes);
+  }
 });

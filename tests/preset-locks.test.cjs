@@ -52,8 +52,56 @@ test("stat-edit options keep their UI category and follow all relic writes in th
   const fallback = preview({ writes: [{ comment: "j 0x800e493c" }] }, options);
   assert.deepEqual(fallback.writes.map((write) => write.comment), [
     "First relic", "Relic follow-up", "Second relic", "Raise strength", "Raise defense",
-    "Stat follow-up", "j 0x800e493c", "Regular patch"
+    "Stat follow-up", "Regular patch", "j 0x800e493c"
   ]);
+});
+
+test("regular option writes precede the return and nop without redirecting the return address", () => {
+  const template = JSON.parse(readFileSync(path.join(__dirname, "../templates/preset-template.json"), "utf8"));
+  const original = structuredClone(template);
+  const options = toPresetOptions([
+    { id: 1, comment: "Relic", category: "relics", type: "word", value: "0xa0627964", address: null },
+    { id: 2, comment: "Stat", category: "gameplay", type: "word", value: "0x00000001", statEdit: true },
+    { id: 3, comment: "Init", category: "gameplay", type: "word", value: "0x00000002", gameInit: true },
+    { id: 4, comment: "Patch", category: "world", type: "word", value: "0x12345678", address: "0x1000",
+      additionalWrites: [{ comment: "Patch follow-up", type: "word", value: "0x12345679" }] }
+  ].map((entry) => ({ gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...entry })));
+  const originalOptions = structuredClone(options);
+  const result = preview(template, options);
+  assert.deepEqual(result.writes.slice(-2), [
+    { ...template.writes.at(-2), address: "0x00158cb0" }, template.writes.at(-1)
+  ]);
+  assert.deepEqual(result.writes.slice(3, -2).map((write) => write.comment), [
+    "Relic", "Stat", "lui v1, 0x8004", "Init", "Patch", "Patch follow-up"
+  ]);
+  assert.deepEqual(template, original);
+  assert.deepEqual(options, originalOptions);
+  assert.deepEqual(preview(template, options, []).writes, template.writes);
+});
+
+test("raw JSON writes retain their existing replacement behavior", () => {
+  const template = JSON.parse(readFileSync(path.join(__dirname, "../templates/preset-template.json"), "utf8"));
+  const raw = { writes: [...template.writes, { comment: "Raw patch", address: "0x2000", type: "word", value: "0x12345678" }] };
+  const original = structuredClone(raw);
+  const options = [option("regular", "Regular", { appendedWrites: [{ comment: "Regular patch" }] }),
+    option("raw", "Raw", { previewJson: raw })];
+  assert.deepEqual(preview(template, options).writes, raw.writes);
+  assert.deepEqual(raw, original);
+});
+
+test("a game-init anchor after the return cannot put option writes past the return", () => {
+  const tail = [
+    { reason: "Return from injected code", type: "word", value: "0x0803924f" },
+    { type: "word", value: "0x00000000", comment: "nop" },
+    { type: "word", value: "0x3c038004", comment: "lui v1, 0x8004" }
+  ];
+  const options = [option("all", "All", { injectedWrites: [{ comment: "Relic" }],
+    gameInitWrites: [{ comment: "Init" }], appendedWrites: [{ comment: "Patch" }] })];
+  assert.deepEqual(preview({ writes: tail }, options).writes, [
+    { comment: "Relic" }, { type: "word", value: "0x3c038004", comment: "lui v1, 0x8004" },
+    { comment: "Init" }, { comment: "Patch" }, ...tail
+  ]);
+  assert.deepEqual(preview({}, options).writes.map((write) => write.comment), ["Relic", "lui v1, 0x8004", "Init", "Patch"]);
 });
 
 test("removes all selected relics from every combination using exact names", () => {

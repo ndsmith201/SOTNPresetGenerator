@@ -32,6 +32,7 @@ export interface BuiltInSettings {
 export interface Preset {
   id: string;
   name: string;
+  description?: string;
   optionIds: string[];
   complexity: number;
   metaExtension: MetaExtension;

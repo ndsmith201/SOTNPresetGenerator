@@ -20,7 +20,7 @@ import type {
 } from "./types";
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
-import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections } from "./template-options";
+import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -454,8 +454,11 @@ export function buildPreviewPreset(
     }
   });
 
-  const templateWrites = Array.isArray(preview.writes)
-    ? preview.writes.filter(isJsonObject).map((write) => structuredClone(write))
+  // Presets without writes still need the default startup routine and anchors.
+  const sourceWrites = Array.isArray(preview.writes) && preview.writes.length > 0
+    ? preview.writes : template?.writes;
+  const templateWrites = Array.isArray(sourceWrites)
+    ? sourceWrites.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
   // Keep each option's writes together, with all stat edits following the relics.
   const injectionOrder = [
@@ -465,15 +468,17 @@ export function buildPreviewPreset(
   const injected = injectionOrder.flatMap((option) => structuredClone(option.injectedWrites));
   const gameInit = additions.flatMap((option) => structuredClone(option.gameInitWrites));
   const appended = additions.flatMap((option) => structuredClone(option.appendedWrites));
-  let gameInitAnchorIndex = templateWrites.findIndex(isGameInitAnchor);
+  const returnIndex = templateWrites.findIndex(isReturnJump);
+  let gameInitAnchorIndex = templateWrites.findIndex((write, index) =>
+    isGameInitAnchor(write) && (returnIndex < 0 || index < returnIndex)
+  );
   const selectedGameInit = selected.filter((option) => option.gameInitWrites.length > 0);
   if (gameInitAnchorIndex < 0 && selectedGameInit.length > 0) {
-    // Installed presets may only initialize the relic bank (0x8009). Game
-    // init stores need their own bank setup, including already-matched options
-    // in drafts exported before the missing-anchor fallback was corrected.
+    // Installed presets may only initialize the relic bank (0x8009). Restore
+    // the game bank before both new and already-inherited game init writes.
     const inheritedIndices = matchTemplateOptions({ writes: templateWrites }, selectedGameInit)
-      .flatMap((match) => match.writeIndices);
-    const returnIndex = templateWrites.findIndex(isReturnJump);
+      .flatMap((match) => match.writeIndices)
+      .filter((index) => returnIndex < 0 || index < returnIndex);
     gameInitAnchorIndex = inheritedIndices.length > 0 ? Math.min(...inheritedIndices)
       : returnIndex < 0 ? templateWrites.length : returnIndex;
     templateWrites.splice(gameInitAnchorIndex, 0, {
@@ -485,10 +490,22 @@ export function buildPreviewPreset(
     const shiftedAnchorIndex = gameInitAnchorIndex + injected.length;
     templateWrites.splice(shiftedAnchorIndex + 1, 0, ...gameInit);
   } else {
-    const returnIndex = templateWrites.findIndex(isReturnJump);
     templateWrites.splice(returnIndex < 0 ? templateWrites.length : returnIndex, 0, ...injected, ...gameInit);
   }
-  templateWrites.push(...appended);
+  // Never split the return jump from its delay slot or put option writes after it.
+  const finalReturnIndex = templateWrites.findIndex(isReturnJump);
+  const firstAddressedPatch = appended.findIndex((write) => write.address !== undefined);
+  if (finalReturnIndex >= 0 && firstAddressedPatch >= 0 && templateWrites[finalReturnIndex].address === undefined) {
+    // Addressed patches change the implicit write cursor. Resume the injected
+    // routine at its original end, including any new unaddressed instructions.
+    const locations = writeLocations([
+      ...templateWrites.slice(0, finalReturnIndex), ...appended.slice(0, firstAddressedPatch),
+      templateWrites[finalReturnIndex]
+    ]);
+    const address = locations.at(-1)?.address;
+    if (address !== undefined) templateWrites[finalReturnIndex].address = `0x${address.toString(16).padStart(8, "0")}`;
+  }
+  templateWrites.splice(finalReturnIndex < 0 ? templateWrites.length : finalReturnIndex, 0, ...appended);
   preview.writes = templateWrites;
   const merged = additions.reduce(
     (merged, option) => option.previewJson ? { ...merged, ...structuredClone(option.previewJson) } : merged,
@@ -497,6 +514,7 @@ export function buildPreviewPreset(
   const mergedMetadata = isJsonObject(merged.metadata) ? merged.metadata : {};
   mergedMetadata.id = presetIdFromName(preset.name);
   mergedMetadata.name = preset.name;
+  if (typeof preset.description === "string") mergedMetadata.description = preset.description;
   mergedMetadata.metaComplexity = complexity.toString();
   if (extensionChanged || !Object.hasOwn(mergedMetadata, "metaExtension")) mergedMetadata.metaExtension = extension;
   const configuredAuthor = author?.trim();
