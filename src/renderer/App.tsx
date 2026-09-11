@@ -278,7 +278,7 @@ export function App() {
     return result.path;
   }, [exportPath, showToast]);
 
-  const exportPreset = async () => {
+  const exportPreset = async (json = previewJson) => {
     if (!activePreset || !preview || operationPending.current) return;
     operationPending.current = true;
     setExporting(true);
@@ -291,10 +291,10 @@ export function App() {
         delete next[key];
         return next;
       });
-      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json: previewJson, localPresetId: activePreset.id });
+      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json, localPresetId: activePreset.id });
       if (!isJsonObject(result)) throw new Error("Export failed");
       if (result.status === "exported" && typeof result.path === "string" && typeof result.buildToken === "string") {
-        const exported = { localPresetId: activePreset.id, directory: destination, json: previewJson, buildToken: result.buildToken };
+        const exported = { localPresetId: activePreset.id, directory: destination, json, buildToken: result.buildToken };
         setSuccessfulExports((current) => ({ ...current, [key]: exported }));
         showToast(`Exported and built ${result.path.split(/[\\/]/).pop() ?? "preset file"}`);
         setInstalledRevision((value) => value + 1);
@@ -388,13 +388,19 @@ export function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [activePreset, loginOpen, shareTarget, communityItem, optionToDelete, updateOpen, showToast]);
 
-  const share = async () => {
+  const share = async (description?: string) => {
     if (!shareTarget) return;
     const account = await communityRequest<CommunityStatus>({ action: "status" });
     if (!account.signedIn) { setLoginOpen(true); throw new Error("Sign in to share, then confirm again."); }
     let item: CatalogItem;
     if (shareTarget === "preset") {
-      const built = canGenerate ? currentExport : await exportPreset();
+      if (!activePreset || !description?.trim()) throw new Error("Enter a description before sharing.");
+      const sharedPreset = { ...activePreset, description: description.trim() };
+      const sharedPreview = buildPreviewPreset(template, sharedPreset, options, effectiveAuthor, maximumComplexity);
+      if (!sharedPreview) throw new Error("Preset template is unavailable.");
+      const sharedJson = JSON.stringify(sharedPreview);
+      updateActivePreset({ description: sharedPreset.description });
+      const built = exportMatchesCurrent(currentExport, activePresetId, exportPath, sharedJson) ? currentExport : await exportPreset(sharedJson);
       if (!built) throw new Error("Export and build the preset to continue sharing.");
       item = await communityRequest<CatalogItem>({ action: "sharePreset", buildToken: built.buildToken });
     } else {

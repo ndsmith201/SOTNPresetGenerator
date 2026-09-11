@@ -49,7 +49,7 @@ async function main() {
     };
 
   `);
-  const win = new BrowserWindow({ show: false, width: 1360, height: 900, webPreferences: { preload, contextIsolation: false, sandbox: false, backgroundThrottling: false } });
+  const win = new BrowserWindow({ show: false, width: 1360, height: 900, webPreferences: { preload, contextIsolation: false, sandbox: false, backgroundThrottling: false, offscreen: true } });
   const evaluate = code => win.webContents.executeJavaScript(code, true);
   const waitFor = async expression => {
     for (let i = 0; i < 100; i++) {
@@ -60,10 +60,10 @@ async function main() {
   };
   const click = async selector => { await waitFor(`Boolean(document.querySelector(${JSON.stringify(selector)}))`); await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`); };
   const button = async label => {
-    const expression = `[...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(label)} && !b.closest('[hidden]'))`;
+    const expression = `[...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(label)} && b.checkVisibility())`;
     await waitFor(`Boolean(${expression})`); await evaluate(`(${expression}).click()`);
   };
-  const fill = (selector, value) => evaluate(`(() => { const input = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const fill = (selector, value) => evaluate(`(() => { const input = document.querySelector(${JSON.stringify(selector)}); const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   const screenshot = async name => { await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'); await new Promise(resolve => setTimeout(resolve, 100)); await fs.writeFile(path.join(__dirname, '../dist', name), (await win.webContents.capturePage()).toPNG()); };
   try {
     await win.loadFile(path.join(__dirname, '../dist/renderer/index.html'));
@@ -108,6 +108,7 @@ async function main() {
     await evaluate(`document.querySelector('.option-actions-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
     await click('[aria-label="Actions for My shortcut"]'); await click('.option-actions-menu button:nth-child(2)');
     await waitFor(`Boolean(document.querySelector('.share-dialog[open]'))`);
+    assert.equal(await evaluate(`Boolean(document.querySelector('#sharePresetDescription'))`), false);
     await button('Cancel');
     assert.equal(await evaluate(`window.__calls.filter(c => c.action === 'shareOption').length`), 0);
     await click('[aria-label="Actions for My shortcut"]'); await click('.option-actions-menu button:nth-child(2)');
@@ -127,15 +128,43 @@ async function main() {
     await fill('#loginUsername', 'runner'); await fill('#loginPassword', 'ExamplePassword!1'); await click('.login-dialog button[type="submit"]');
     await waitFor(`Boolean(document.querySelector('.share-dialog[open]'))`);
     assert.equal(await evaluate(`window.__calls.filter(c => c.action === 'sharePreset' || c.action === 'export').length`), 0);
-    await screenshot('community-share.png');
+    assert.equal(await evaluate(`document.querySelector('#sharePresetDescription').value`), template.metadata.description);
+    await fill('#sharePresetDescription', '   ');
     await button('Share publicly');
+    await waitFor(`document.querySelector('.share-dialog .community-error')?.textContent.includes('Enter a description')`);
+    assert.equal(await evaluate(`window.__calls.filter(c => c.action === 'sharePreset' || c.action === 'export').length`), 0);
+    await fill('#sharePresetDescription', 'Canceled description');
+    await button('Cancel');
+    await waitFor(`!document.querySelector('.share-dialog')`);
+    await button('Share');
+    await waitFor(`Boolean(document.querySelector('.share-dialog[open]'))`);
+    assert.equal(await evaluate(`document.querySelector('#sharePresetDescription').value`), template.metadata.description);
+    await fill('#sharePresetDescription', '  Explore the castle with shortcuts.\nA relaxed first run.  ');
+    assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).metadata.description`), 'Explore the castle with shortcuts.\nA relaxed first run.');
+    await screenshot('community-share.png');
+    await evaluate('window.__failNextShare = true');
+    await button('Share publicly');
+    await waitFor(`document.querySelector('.share-dialog .community-error')?.textContent.includes('Test service unavailable')`);
+    assert.equal(await evaluate(`document.querySelector('#sharePresetDescription').value.trim()`), 'Explore the castle with shortcuts.\nA relaxed first run.');
+    await button('Share publicly');
+    await waitFor(`!document.querySelector('.share-dialog')`);
     await waitFor(`window.__calls.some(c => c.action === 'sharePreset')`);
     const calls = await evaluate(`window.__calls.filter(c => c.action === 'export' || c.action === 'sharePreset')`);
-    assert.deepEqual(calls.map(c => c.action), ['export', 'sharePreset']);
+    assert.deepEqual(calls.map(c => c.action), ['export', 'sharePreset', 'sharePreset']);
     assert.equal(calls[1].buildToken, 'verified-build');
     assert.equal(JSON.parse(calls[0].json).metadata.author.at(-1), 'runner');
     assert.equal(JSON.parse(calls[0].json).metadata.author.includes('Settings author'), false);
+    assert.equal(JSON.parse(calls[0].json).metadata.description, 'Explore the castle with shortcuts.\nA relaxed first run.');
     await waitFor(`!document.querySelector('.share-dialog')`);
+    await button('Share');
+    await waitFor(`Boolean(document.querySelector('.share-dialog[open]'))`);
+    assert.equal(await evaluate(`document.querySelector('#sharePresetDescription').value`), 'Explore the castle with shortcuts.\nA relaxed first run.');
+    await fill('#sharePresetDescription', 'Updated route description');
+    await button('Share publicly');
+    await waitFor(`!document.querySelector('.share-dialog')`);
+    const updatedCalls = await evaluate(`window.__calls.filter(c => c.action === 'export' || c.action === 'sharePreset')`);
+    assert.deepEqual(updatedCalls.map(c => c.action), ['export', 'sharePreset', 'sharePreset', 'export', 'sharePreset']);
+    assert.equal(JSON.parse(updatedCalls[3].json).metadata.description, 'Updated route description');
     await screenshot('community-local-editor.png');
     await click('[aria-label="Actions for My shortcut"]');
     await screenshot('option-actions.png');
@@ -155,6 +184,7 @@ async function main() {
     await click('[aria-label="Edit Castle challenge"]');
     await waitFor(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author.at(-1) === 'runner'`);
     assert.equal(await evaluate(`Boolean(document.querySelector('.login-dialog'))`), false);
+    assert.equal(await evaluate(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.description`), 'Updated route description');
     await win.setSize(850, 700);
     await screenshot('community-local-editor-small.png');
     await fs.writeFile(path.join(__dirname, '../dist/community-ui-result.json'), JSON.stringify({ passed: true, completedAt: new Date().toISOString() }));

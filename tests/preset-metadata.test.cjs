@@ -38,3 +38,15 @@ test("configured author creates an author list when generated metadata has none"
   const result = buildPreviewPreset({}, preset, [], "Configured author");
   assert.deepEqual(result.metadata.author, ["Configured author"]);
 });
+
+test("a saved preset description overrides template and raw option metadata", () => {
+  const template = { metadata: { description: "Template description", author: [] } };
+  const raw = { id: "raw", label: "Metadata", category: "world", injectedWrites: [], gameInitWrites: [], appendedWrites: [],
+    previewJson: { metadata: { description: "Option description", author: ["Option author"] } } };
+  const original = structuredClone({ template, raw });
+  const draft = { ...preset, optionIds: [raw.id], description: "A custom route.\nWith shortcuts." };
+  const output = buildPreviewPreset(template, draft, [raw], "runner");
+  assert.equal(output.metadata.description, draft.description);
+  assert.deepEqual(output.metadata.author, ["Option author", "runner"]);
+  assert.deepEqual({ template, raw }, original);
+});

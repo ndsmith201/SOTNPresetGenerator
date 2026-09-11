@@ -514,6 +514,7 @@ export function buildPreviewPreset(
   const mergedMetadata = isJsonObject(merged.metadata) ? merged.metadata : {};
   mergedMetadata.id = presetIdFromName(preset.name);
   mergedMetadata.name = preset.name;
+  if (typeof preset.description === "string") mergedMetadata.description = preset.description;
   mergedMetadata.metaComplexity = complexity.toString();
   if (extensionChanged || !Object.hasOwn(mergedMetadata, "metaExtension")) mergedMetadata.metaExtension = extension;
   const configuredAuthor = author?.trim();
