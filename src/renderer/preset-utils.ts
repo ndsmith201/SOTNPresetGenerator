@@ -454,8 +454,11 @@ export function buildPreviewPreset(
     }
   });
 
-  const templateWrites = Array.isArray(preview.writes)
-    ? preview.writes.filter(isJsonObject).map((write) => structuredClone(write))
+  // Presets without writes still need the default startup routine and anchors.
+  const sourceWrites = Array.isArray(preview.writes) && preview.writes.length > 0
+    ? preview.writes : template?.writes;
+  const templateWrites = Array.isArray(sourceWrites)
+    ? sourceWrites.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
   // Keep each option's writes together, with all stat edits following the relics.
   const injectionOrder = [

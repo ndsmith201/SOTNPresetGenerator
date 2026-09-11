@@ -31,6 +31,24 @@ test("default generation keeps the anchor between relic grants and game init wri
   assert.deepEqual(template, original);
 });
 
+test("presets with missing or empty writes copy the default routine before applying options", () => {
+  const originalTemplate = structuredClone(template);
+  for (const writes of [undefined, [], null]) {
+    const source = { music: true, ...(writes === undefined ? {} : { writes }) };
+    const originalSource = structuredClone(source);
+    const withoutOptions = generate(source, []);
+    assert.deepEqual(withoutOptions.writes, template.writes);
+    assert.equal(withoutOptions.music, true);
+    const withOptions = generate(source);
+    assert.deepEqual(withOptions.writes, generate().writes);
+    assert.ok(detectStartingRelics(withOptions).has("Soul of Bat"));
+    assert.deepEqual(generate(withOptions).writes, withOptions.writes);
+    withoutOptions.writes[0].value = "changed";
+    assert.deepEqual(template, originalTemplate);
+    assert.deepEqual(source, originalSource);
+  }
+});
+
 test("installed presets without an anchor initialize the game bank before new game init options", () => {
   const source = { writes: template.writes.filter((write) => Number(write.value) !== 0x3c038004) };
   const original = structuredClone(source);

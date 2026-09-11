@@ -90,6 +90,8 @@ Choose **Settings → Export directory** and select the SOTNRando repository roo
 
 A draft created from an installed preset stores its own copy of the source JSON, so it remains usable after restarting the app or changing the configured directory. Existing source settings are preserved where supported, and missing built-in settings receive the application's defaults.
 
+If the source has no writes or an empty writes array, the generated copy starts with the default template's writes before applying selected options.
+
 Generated copies omit `inherits`; the app does not recursively resolve another preset's inherited settings. They also replace the source's `lockLocation` with the bundled template's checks for the selected extension before applying starting-relic adjustments. Review the generated JSON when adapting presets with custom inheritance or access rules.
 
 Catalog options whose complete writes or raw JSON settings match the source are selected automatically. Matching ignores write comments and hexadecimal case or padding, but checks addresses and every write in an option. Matched options reuse source entries instead of duplicating them. Unchecking a matched option removes its effect from the generated copy; startup instructions become no-ops where needed to preserve code positions. Later deselections persist across restarts.
