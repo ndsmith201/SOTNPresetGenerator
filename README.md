@@ -164,19 +164,23 @@ For example, starting with only Soul of Bat allows a maximum of eight in Guarded
 
 ## Custom options
 
-Use **+ New option** to add reusable configuration to the SQLite-backed catalog. Give it a **Comment** (the name displayed on its card), an optional **Description**, and a category. New options stay editable across restarts and are available to all local presets; editing their definition affects generated output for presets that select them.
+Use **+ New option** to add reusable configuration to the SQLite-backed catalog. Choose **Copy an existing option**, **Memory patch**, or **JSON settings**. Copying any catalog option, including a registered option, creates a separate editable definition. Search by name or description to find a starting point.
 
-![Option details dialog showing a registered option's write fields and placement controls](docs/screenshots/option-details.png)
+Give the option an **Option name**, optional **Description**, and category. The adjacent preview shows its card, write count, placement, and expandable generated JSON. New options stay editable across restarts and are available to all local presets; editing their definition affects generated output for presets that select them. **Also enable in this preset** selects a newly created option in the current draft; it is unchecked by default.
+
+![Option editor showing write rows with individual optional addresses and a live option preview](docs/screenshots/option-authoring-editor.png)
 
 ### Write options
 
-A write option defines a `char`, `short`, `word`, `long`, or `string` value. An optional hexadecimal **Address** must begin with `0x`. **Additional writes** accepts a JSON array of objects, allowing one option to contribute a sequence of writes.
+A memory patch contains one or more write rows, each with a `char`, `short`, `word`, `long`, or `string` type, **Value**, optional **Address**, and optional **Note**. Each hexadecimal address must begin with `0x`; leave it blank to omit the address. Addresses remain visible on every row, including at smaller window sizes. Add or delete rows and reorder them using the arrow buttons or by dragging their row numbers. Notes, addresses, and extra JSON properties move with the write, including when it becomes the first write.
 
-**Game init** places the option's writes after the template's `lui v1, 0x8004` initialization anchor. **Edits stats** orders its injected writes after relic-option writes. These two placement flags are mutually exclusive. Addressed writes and unaddressed injected writes follow the generator's template assembly rules; inspect the preview when authoring patches.
+**Write placement** offers **Default placement**, **Game initialization** (after the template's `lui v1, 0x8004` anchor), and **After relic writes** (for injected starting-stat changes). These choices preserve the generator's existing assembly rules. The option preview shows the write sequence before template assembly; inspect the preset preview when authoring patches.
+
+**Advanced JSON** edits the complete sequence as an array of write objects. Apply or discard JSON edits before saving or returning to row editing; extra properties are preserved. Switching between memory patches and JSON settings retains both drafts while the dialog is open. Only the selected mode is saved.
 
 ### Raw JSON options
 
-Enable **Raw JSON** to enter a JSON object that merges into the top level of the preview instead of adding a write. For example:
+Choose **JSON settings** to enter a JSON object that merges into the top level of the preview instead of adding a write. For example:
 
 ```json
 {
@@ -184,9 +188,13 @@ Enable **Raw JSON** to enter a JSON object that merges into the top level of the
 }
 ```
 
-The merge replaces matching top-level values; it is not a recursive merge of nested objects. The name, ID, complexity, selected extension, and extension check filtering are enforced by the generator after merging. Raw JSON disables the write address, write type, and write-placement fields. Invalid JSON, non-object raw JSON, and malformed additional-write arrays are rejected by the option dialog.
+The merge replaces matching top-level values; it is not a recursive merge of nested objects. The name, ID, complexity, selected extension, and extension check filtering are enforced by the generator after merging. JSON settings hide the write editor and placement fields. Invalid JSON, non-object settings, and malformed write arrays are rejected by the option dialog.
 
 Registered options are read-only: use the eye button to inspect and select/copy their values. Their settings cannot be saved over from this dialog. The read-only migration marks pre-existing options as registered without changing their values or preset selections; newly created options remain editable.
+
+Viewing a community option uses the same editor layout as creating an option: mode icons, write rows with individual addresses, placement, and JSON preview. All definition fields are read-only, while values remain selectable and JSON sections can be expanded. Community voting and **Add to my options** remain in the header.
+
+The catalog adds an optional `primary_write_json` field on startup to preserve independent notes and extra properties on the first write. Existing definitions keep their original output, and older release snapshots remain supported.
 
 ## JSON preview and export
 
@@ -218,12 +226,10 @@ The button reads **Building…** while export is running. A successful export re
 
 ## Settings, shortcuts, and local storage
 
-**Settings** provides four preferences:
+**Settings** provides two preferences and a read-only app version row. Long lines in JSON previews wrap automatically.
 
 | Setting | Behavior |
 | --- | --- |
-| Compact option cards | Uses denser cards to show more options in the list. |
-| Wrap JSON lines | Wraps long lines in the JSON display. |
 | Export directory | Remembers the SOTNRando root used for installed presets and export. |
 | Preset author | Adds the signed-in username to generated preset authors. When signed out, uses the name saved here; leave it blank to keep only the template authors. The saved setting is preserved when signing in or out. |
 
@@ -282,7 +288,9 @@ Packaging also runs `scripts/bundle-sotnrando.cjs`: it fetches the official comm
 
 Local packaging automatically exports your current `%APPDATA%/sotn-preset-generator/options.sqlite` to `database/options-dump.sql`. Set `SOTN_OPTIONS_DATABASE` to use another database. Export opens the source read-only and includes committed changes even while the app is open. A missing or invalid source stops packaging. Every installer and ZIP bundles the snapshot, and `options-dump.sql` is also uploaded as a separate release asset.
 
-On first launch, the app preloads the snapshot's complete options catalog, including IDs, descriptions, write data, and read-only flags. Existing installations keep their catalog, including edits and deletions; updates do not reimport the release snapshot.
+On first launch, the app preloads the snapshot's complete options catalog, including IDs, descriptions, write data, and read-only flags. Existing installations keep their catalog; updates do not reimport the release snapshot. Both new and existing installations then apply pending SQL migrations from `database/migrations`, recording each completed migration in `options_migrations`. Each migration and its completion record run in one transaction, so failures roll back and retry on the next launch.
+
+`001-built-in-option-descriptions.sql` updates the 16 reviewed descriptions, matching built-ins by ID, name, and read-only status. It leaves skipped options, editable local options, and all other fields unchanged, and does not recreate deleted entries. To ship later catalog changes, add a new migration to the list in `src/options-database.ts` and the runtime file allowlist in `forge.config.cjs`; keep previously released migrations unchanged. Exporting a fresh snapshot does not remove these migration files or export the local migration history.
 
 The **Release Windows** GitHub Actions workflow publishes to this repository's **GitHub Releases** when a `v*` tag is pushed. The tag must match `package.json` exactly and point to the checked-out commit. After committing the application and workflow changes, a typical release is:
 

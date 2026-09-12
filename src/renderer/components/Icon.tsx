@@ -6,6 +6,8 @@ export type IconName =
   | "check"
   | "close"
   | "copy"
+  | "cpu"
+  | "code"
   | "diamond"
   | "download"
   | "eye"
@@ -32,6 +34,8 @@ export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGEle
     check: <path d="m3 8 3 3 7-7" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     copy: <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+    cpu: <><rect x="6" y="6" width="12" height="12" rx="2" /><rect x="9" y="9" width="6" height="6" rx=".5" /><path d="M9 3v3M12 3v3M15 3v3M9 18v3M12 18v3M15 18v3M3 9h3M3 12h3M3 15h3M18 9h3M18 12h3M18 15h3" /></>,
+    code: <path d="M9 3H7a2 2 0 0 0-2 2v4a3 3 0 0 1-2 3 3 3 0 0 1 2 3v4a2 2 0 0 0 2 2h2M15 3h2a2 2 0 0 1 2 2v4a3 3 0 0 0 2 3 3 3 0 0 0-2 3v4a2 2 0 0 1-2 2h-2" />,
     diamond: <><path d="m12 3.5 8 7.5-8 9.5L4 11l8-7.5Z" /><path d="m4 11 8 2 8-2M8.5 7l3.5 6 3.5-6" /></>,
     download: <><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M5 14.5V20h14v-5.5" /></>,
     eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,

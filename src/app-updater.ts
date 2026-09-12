@@ -29,7 +29,8 @@ export function selectUpdate(value: unknown, currentVersion: string, arch: strin
   if (!assets.has(`SOTNPresetGenerator-${version}-win32-${arch}-Setup.exe`)) return null;
   const hasFeed = assets.has("RELEASES") && assets.has(`SOTNPresetGenerator-${version}-full.nupkg`);
   const tag = encodeURIComponent(release.tag_name);
-  return { version, pageUrl: `${repositoryUrl}/releases/tag/${tag}`, feedUrl: `${repositoryUrl}/releases/download/${tag}`, automatic: squirrelInstalled && hasFeed };
+  return { version, pageUrl: `${repositoryUrl}/releases/tag/${tag}`, feedUrl: `${repositoryUrl}/releases/download/${tag}`, automatic: squirrelInstalled && hasFeed,
+    notes: typeof release.body === "string" ? release.body.trim() : "" };
 }
 
 interface NativeUpdater extends EventEmitter {

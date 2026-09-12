@@ -3,6 +3,7 @@ export interface UpdateRelease {
   pageUrl: string;
   feedUrl: string;
   automatic: boolean;
+  notes: string;
 }
 
 export interface UpdateState {

@@ -268,6 +268,7 @@ export function isDatabaseOption(value: unknown): value is DatabaseOption {
     typeof value.gameInit === "boolean" &&
     typeof value.statEdit === "boolean" &&
     typeof value.rawJson === "boolean" &&
+    (value.primaryWrite === undefined || isJsonObject(value.primaryWrite)) &&
     Array.isArray(value.additionalWrites) &&
     value.additionalWrites.every(isJsonObject)
   );
@@ -284,8 +285,8 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
         previewJson = null;
       }
     }
-    const primaryWrite: WriteEntry = { comment: option.comment, type: option.type, value: option.value };
-    if (option.address) primaryWrite.address = option.address;
+    const primaryWrite: WriteEntry = option.primaryWrite ? structuredClone(option.primaryWrite) : { comment: option.comment, type: option.type, value: option.value };
+    if (!option.primaryWrite && option.address) primaryWrite.address = option.address;
     const writes = option.rawJson ? [] : [primaryWrite, ...option.additionalWrites.map((write) => structuredClone(write))];
     const injectRelicWrites = !option.rawJson && !option.gameInit &&
       (option.statEdit || (option.category === "relics" && !option.address));

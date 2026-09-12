@@ -17,7 +17,7 @@ interface Dependencies {
   fetcher?: typeof fetch;
 }
 export function optionSubmission(option: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(["comment", "description", "category", "type", "value", "address", "gameInit", "statEdit", "rawJson", "additionalWrites"].filter(key => option[key] !== undefined).map(key => [key, option[key]]));
+  return Object.fromEntries(["comment", "description", "category", "type", "value", "address", "gameInit", "statEdit", "rawJson", "additionalWrites", "primaryWrite"].filter(key => option[key] !== undefined).map(key => [key, option[key]]));
 }
 
 export class CommunityService {

@@ -4,8 +4,6 @@ import { Icon } from "./Icon";
 interface WindowBarProps {
   onCommunity: () => void;
   editing: boolean;
-  compactMode: boolean;
-  wrapJson: boolean;
   exportPath: string;
   author: string;
   onEditAuthor: () => void;
@@ -13,8 +11,6 @@ interface WindowBarProps {
   onNewPreset: () => void;
   onSavePreset: () => void;
   onShowLibrary: () => void;
-  onToggleCompact: () => void;
-  onToggleWrap: () => void;
   onChooseExportPath: () => void;
 }
 
@@ -57,9 +53,6 @@ export function WindowBar(props: WindowBarProps) {
         <div className="menu-root">
           <button className="menu-trigger" type="button" aria-haspopup="menu" aria-expanded={openMenu === "settings"} onClick={() => setOpenMenu(openMenu === "settings" ? null : "settings")}>Settings</button>
           <div className="menu-popover settings-menu" role="menu" hidden={openMenu !== "settings"}>
-            <button type="button" role="menuitemcheckbox" aria-checked={props.compactMode} onClick={() => act(props.onToggleCompact)}><span className="menu-checkbox"><Icon name="check" /></span>Compact option cards</button>
-            <button type="button" role="menuitemcheckbox" aria-checked={props.wrapJson} onClick={() => act(props.onToggleWrap)}><span className="menu-checkbox"><Icon name="check" /></span>Wrap JSON lines</button>
-            <span className="menu-separator" role="separator" />
             <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onChooseExportPath)}>
               <span className="path-menu-copy"><strong>Export directory</strong><small title={props.exportPath}>{props.exportPath || "Not selected"}</small></span>
               <Icon name="folder" />
@@ -68,6 +61,8 @@ export function WindowBar(props: WindowBarProps) {
               <span className="path-menu-copy"><strong>Preset author</strong><small title={props.author}>{props.author || "Use template author"}</small></span>
               <Icon name="file" />
             </button>
+            <span className="menu-separator" role="separator" />
+            <button type="button" role="menuitem" disabled>Version {window.presetApp.version}</button>
           </div>
         </div>
         <div className="menu-root">

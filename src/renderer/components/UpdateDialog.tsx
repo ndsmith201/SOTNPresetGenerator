@@ -28,6 +28,10 @@ export function UpdateDialog({ state, onLater, onRestart }: { state: UpdateState
     <div className="preset-dialog-card">
       <span className="step-label">App update</span><h2 id="updateTitle">{busy ? <>Updating your app<span className="update-ellipsis" aria-hidden="true">.<span>.</span><span>.</span></span></> : "A new version is available"}</h2>
       <p>Version {state.release?.version} is available. You’re using {state.currentVersion}.</p>
+      <section className="update-changelog" aria-labelledby="updateChangelogTitle">
+        <h3 id="updateChangelogTitle">Changelog</h3>
+        <div className="update-changelog-notes" tabIndex={0}>{state.release?.notes || "No changelog was provided for this release."}</div>
+      </section>
       {busy ? <p role="status">{state.phase === "downloading" ? "Downloading and preparing the update… The app will restart when it’s ready." : "Saving your presets and restarting…"}</p> : state.release?.automatic ?
         <p>Update now and restart the app. Your saved presets, options, settings, and login will be kept.</p> :
         <p>This copy needs a manual update. Download and run the latest Windows installer to enable automatic updates. Your saved presets, options, settings, and login will be kept.</p>}

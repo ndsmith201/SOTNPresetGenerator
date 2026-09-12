@@ -24,6 +24,7 @@ export interface PresetAppApi {
     statEdit?: boolean;
     rawJson?: boolean;
     additionalWrites?: Record<string, unknown>[];
+    primaryWrite?: Record<string, unknown>;
   }) => Promise<unknown>;
   updateOption: (id: number, request: {
     comment: string;
@@ -36,6 +37,7 @@ export interface PresetAppApi {
     statEdit?: boolean;
     rawJson?: boolean;
     additionalWrites?: Record<string, unknown>[];
+    primaryWrite?: Record<string, unknown>;
   }) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
   exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;

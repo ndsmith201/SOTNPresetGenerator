@@ -2,8 +2,6 @@ import type { UpdateState } from "../update-types";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  COMPACT_MODE_KEY,
-  JSON_WRAP_KEY,
   PRESET_AUTHOR_KEY,
   SOTNRANDO_PATH_KEY
 } from "./constants";
@@ -68,8 +66,6 @@ export function App() {
   const [successfulExports, setSuccessfulExports] = useState<Record<string, SuccessfulExport>>({});
   const operationPending = useRef(false);
   const [toast, setToast] = useState("");
-  const [compactMode, setCompactMode] = useState(() => localStorage.getItem(COMPACT_MODE_KEY) === "true");
-  const [wrapJson, setWrapJson] = useState(() => localStorage.getItem(JSON_WRAP_KEY) === "true");
   const [exportPath, setExportPath] = useState(() => localStorage.getItem(SOTNRANDO_PATH_KEY) ?? "");
   const [installedPresets, setInstalledPresets] = useState<InstalledPreset[]>([]);
   const [installedLoading, setInstalledLoading] = useState(false);
@@ -110,14 +106,6 @@ export function App() {
     // Save only explicit choices so moving a portable app does not leave a stale default.
     return () => { canceled = true; };
   }, [showToast]);
-  useEffect(() => {
-    document.body.classList.toggle("compact-mode", compactMode);
-    localStorage.setItem(COMPACT_MODE_KEY, compactMode.toString());
-  }, [compactMode]);
-  useEffect(() => {
-    document.body.classList.toggle("wrap-json", wrapJson);
-    localStorage.setItem(JSON_WRAP_KEY, wrapJson.toString());
-  }, [wrapJson]);
   useEffect(() => {
     if (initialized) persistPresets(presets);
   }, [initialized, presets]);
@@ -178,6 +166,12 @@ export function App() {
   const currentExport = successfulExports[exportKey];
   const canGenerate = Boolean(preview && exportMatchesCurrent(currentExport, activePresetId, exportPath, previewJson));
   const communityPreset = useMemo(() => communityItem?.kind === "presets" ? createPresetFromTemplate(communityItemName(communityItem), communityItem.data, options) : null, [communityItem, options]);
+  const communityOption = useMemo(() => {
+    if (communityItem?.kind !== "options") return null;
+    // Public definitions omit local IDs and can omit optional write fields.
+    const candidate = { description: "", address: null, gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...communityItem.data, id: 0, readOnly: true };
+    return isDatabaseOption(candidate) ? candidate : null;
+  }, [communityItem]);
 
   const showLibrary = () => { setActivePresetId(null); setCommunityItem(null); setCommunityError(""); };
   const requireLogin = async (next: () => void) => {
@@ -330,7 +324,7 @@ export function App() {
     }
   };
 
-  const saveOption = async (input: CreateOptionInput) => {
+  const saveOption = async (input: CreateOptionInput, enableInPreset: boolean) => {
     const result = editingOption
       ? await window.presetApp.updateOption(editingOption.id, input)
       : await window.presetApp.createOption(input);
@@ -338,7 +332,11 @@ export function App() {
     if (result.status === "error" && typeof result.error === "string") throw new Error(result.error);
     const expectedStatus = editingOption ? "updated" : "created";
     if (result.status !== expectedStatus || !isDatabaseOption(result.option)) throw new Error(`The option could not be ${editingOption ? "updated" : "created"}.`);
-    setOptions(await fetchOptions());
+    const savedOption = toPresetOptions([result.option])[0];
+    setOptions(current => [...current.filter(item => item.id !== savedOption.id), savedOption].sort((a, b) => a.label.localeCompare(b.label)));
+    if (!editingOption && enableInPreset && activePresetId) {
+      setPresets(current => current.map(preset => preset.id === activePresetId ? { ...preset, optionIds: [...new Set([...preset.optionIds, savedOption.id])], updatedAt: new Date().toISOString() } : preset));
+    }
     setCreateOptionOpen(false);
     setEditingOption(null);
     showToast(editingOption ? "Option updated" : "Option added");
@@ -421,17 +419,17 @@ export function App() {
   return (
     <>
       <div className="app-shell">
-        <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} compactMode={compactMode} wrapJson={wrapJson} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onToggleCompact={() => setCompactMode((value) => !value)} onToggleWrap={() => setWrapJson((value) => !value)} onChooseExportPath={() => void chooseExportPath()} />
+        <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onChooseExportPath={() => void chooseExportPath()} />
         <TopBar communityActions={communityActions} onShare={() => requestShare("preset")} editing={Boolean(activePreset || communityItem)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={showLibrary} onExport={() => { void exportPreset().catch(() => {}); }} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
         {communityItem ? <div className="community-preset-view">
           {communityError && <p className="community-error" role="alert">{communityError}</p>}
-          {communityPreset ? <PresetEditor key={communityItem.id} readOnly preset={communityPreset} maximumComplexity={Math.max(communityPreset.complexity, calculatePresetMaxComplexity(template, communityPreset, options))} options={options.filter(option => communityPreset.optionIds.includes(option.id))} preview={communityItem.data} onChange={() => {}} onNewOption={() => {}} onEditOption={() => {}} onShareOption={() => {}} onDeleteOption={() => {}} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied community JSON"), () => showToast("Unable to copy JSON")); }} /> : <main className="workspace"><section className="options-pane"><span className="step-label">Community option</span><h2>{communityItemName(communityItem)}</h2><p>{String(communityItem.data.description || "Shared with the community")}</p></section><JsonPreview community preview={communityItem.data} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied option JSON"), () => showToast("Unable to copy JSON")); }} /></main>}
+          {communityPreset ? <PresetEditor key={communityItem.id} readOnly preset={communityPreset} maximumComplexity={Math.max(communityPreset.complexity, calculatePresetMaxComplexity(template, communityPreset, options))} options={options.filter(option => communityPreset.optionIds.includes(option.id))} preview={communityItem.data} onChange={() => {}} onNewOption={() => {}} onEditOption={() => {}} onShareOption={() => {}} onDeleteOption={() => {}} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied community JSON"), () => showToast("Unable to copy JSON")); }} /> : communityOption ? <CreateOptionDialog key={communityItem.id} inline open option={communityOption} options={[]} onClose={showLibrary} /> : <main className="workspace"><section className="options-pane"><span className="step-label">Community option</span><h2>{communityItemName(communityItem)}</h2><p>This definition cannot be displayed in the option editor. Its original JSON is available for inspection.</p></section><JsonPreview community preview={communityItem.data} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied option JSON"), () => showToast("Unable to copy JSON")); }} /></main>}
           {communityItem.kind === "presets" && <p className="community-template-note">Use as template to edit a local copy. The editor rebuilds location rules and does not resolve inherited presets; review the resulting JSON before exporting.</p>}
         </div> : activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onShareOption={requestShare} onDeleteOption={setOptionToDelete} onCopy={() => void copyPreview()} /> : <PresetLibrary onViewCommunity={viewCommunity} presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
       <InstalledPresetDialog preset={viewingInstalled} onClose={() => setViewingInstalled(null)} onCreate={(preset) => { setViewingInstalled(null); setInitialTemplate(preset.fileName); setCreatePresetOpen(true); }} onCopy={(preset) => { void navigator.clipboard.writeText(JSON.stringify(preset.json, null, 2)).then(() => showToast("Copied installed JSON"), () => showToast("Unable to copy JSON")); }} />
-      <CreateOptionDialog open={createOptionOpen} option={editingOption} onClose={closeOptionDialog} onSubmit={saveOption} />
+      {!communityOption && <CreateOptionDialog open={createOptionOpen} option={editingOption} options={options.map(item => item.source)} onClose={closeOptionDialog} onSubmit={saveOption} />}
       <AuthorSettingsDialog open={authorSettingsOpen} author={author} onClose={() => setAuthorSettingsOpen(false)} onSave={saveAuthor} />
       <DeletePresetDialog preset={presetToDelete} onClose={() => setPresetToDelete(null)} onDelete={deletePreset} />
       {optionToDelete && <DeleteOptionDialog option={optionToDelete} onClose={() => setOptionToDelete(null)} onDelete={deleteOption} />}

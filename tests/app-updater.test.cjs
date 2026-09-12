@@ -25,6 +25,10 @@ test('release comparison handles numeric versions and refuses downgrades, prerel
 test('only complete matching-architecture releases enable automatic updates and feed URLs stay on this repository', () => {
   const valid = selectUpdate(release(), '0.1.2', 'x64', true);
   assert.equal(valid.automatic, true);
+  assert.equal(valid.notes, '');
+  const notes = '## Changes\n- Show the update changelog.\n- Fix option sharing.';
+  assert.equal(selectUpdate(release('0.2.0', { body: `\n${notes}\n` }), '0.1.2', 'x64', true).notes, notes);
+  for (const body of [null, 42, {}]) assert.equal(selectUpdate(release('0.2.0', { body }), '0.1.2', 'x64', true).notes, '');
   assert.equal(valid.feedUrl, 'https://github.com/ndsmith201/SOTNPresetGenerator/releases/download/v0.2.0');
   assert.equal(selectUpdate(release(), '0.1.2', 'arm64', true), null);
   assert.equal(selectUpdate(release('0.2.0', { draft: true }), '0.1.2', 'x64', true), null);

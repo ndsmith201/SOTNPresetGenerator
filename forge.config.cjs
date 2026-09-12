@@ -17,9 +17,10 @@ const runtimeFiles = new Set([
   '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js', '/dist/bundled-randomizer.js', '/dist/preset-generation.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
   '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
+  '/database/migrations/001-built-in-option-descriptions.sql',
   '/assets/icons/castle-moon.ico'
 ]);
-const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/database', '/templates', '/node_modules', '/assets', '/assets/icons']);
+const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/database', '/database/migrations', '/templates', '/node_modules', '/assets', '/assets/icons']);
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {

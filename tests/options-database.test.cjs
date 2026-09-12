@@ -10,6 +10,30 @@ const { exportOptions, validateDump } = require('../scripts/export-options.cjs')
 const schema = readFileSync(path.join(__dirname, '../database/schema.sql'), 'utf8');
 const dump = readFileSync(path.join(__dirname, '../database/options-dump.sql'), 'utf8');
 const rows = database => database.prepare('SELECT * FROM options ORDER BY id').all();
+const descriptionMigration = '001-built-in-option-descriptions.sql';
+const reviewedDescriptions = new Map([
+  [31, "Death won't take Alucard's gear"],
+  [32, 'Health set to 0 so taking any damage will cause a game over'],
+  [33, 'Alucard will have the poisoned status permanently'],
+  [34, 'All spells available to Alucard in human form are disabled'],
+  [35, 'Fully disable bat wingsmash spell'],
+  [36, 'Bat wingsmash spell doesnt need to be re-entered to keep going'],
+  [37, 'Force of Echo hits every enemy on screen'],
+  [38, 'Reduced wolf transform/charge/collision mana cost'],
+  [39, 'Wingsmash no longer consumes MP'],
+  [40, 'Gravity jump no longer consumes MP'],
+  [41, 'Opens all of the 1st castle teleporters'],
+  [42, 'Opens 2nd castle teleporters'],
+  [43, 'Alucard starts with no equipment'],
+  [44, "Sets all of Alucard's stats to 99"],
+  [46, 'Reduced mana costs for Alucard spells'],
+  [48, 'Opens Alchemy Lab Cannon, Attic Stairs, Colosseum to Royal Chapel, Outer Wall Elevator, Forbidden Route']
+]);
+const reviewedRows = database => rows(database).map(row => {
+  if (reviewedDescriptions.has(row.id)) row.description = reviewedDescriptions.get(row.id);
+  return row;
+});
+const noDump = async () => { throw new Error('Existing installs must not load the snapshot'); };
 
 test('first installation loads every snapshot field and subsequent launches preserve edits and deletions', async () => {
   const source = new DatabaseSync(':memory:');
@@ -17,7 +41,7 @@ test('first installation loads every snapshot field and subsequent launches pres
   try {
     source.exec(dump);
     await initializeOptionsCatalog(installed, schema, async () => dump);
-    assert.deepEqual(rows(installed), rows(source));
+    assert.deepEqual(rows(installed), reviewedRows(source));
     installed.exec("UPDATE options SET comment = 'User edit', read_only = 0 WHERE id = (SELECT MIN(id) FROM options)");
     installed.exec('DELETE FROM options WHERE id = (SELECT MAX(id) FROM options)');
     const edited = rows(installed);
@@ -27,6 +51,71 @@ test('first installation loads every snapshot field and subsequent launches pres
     await initializeOptionsCatalog(installed, schema, async () => { throw new Error('An empty existing catalog is still an existing installation'); });
     assert.equal(rows(installed).length, 0);
   } finally { source.close(); installed.close(); }
+});
+
+test('existing catalogs receive only the reviewed descriptions, once across restarts', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'sotn-options-migration-'));
+  const file = path.join(directory, 'options.sqlite');
+  let database = new DatabaseSync(file);
+  try {
+    database.exec(dump);
+    const expected = reviewedRows(database);
+    await initializeOptionsCatalog(database, schema, noDump);
+    assert.deepEqual(rows(database), expected, 'Skipped descriptions and every other option field stay unchanged');
+    assert.equal(database.prepare('SELECT id FROM options_migrations').get().id, descriptionMigration);
+    database.exec("UPDATE options SET description = 'Later description' WHERE id = 31; DELETE FROM options WHERE id = 48;");
+    const later = rows(database);
+    database.close();
+    database = new DatabaseSync(file);
+    await initializeOptionsCatalog(database, schema, noDump);
+    assert.deepEqual(rows(database), later, 'Completed migration must not rerun or recreate deleted entries');
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM options_migrations').get().count, 1);
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('description migration protects local options, reused IDs, and missing built-ins', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec(dump);
+    database.exec(`
+      UPDATE options SET read_only = 0, description = 'Editable local description' WHERE id = 31;
+      UPDATE options SET comment = 'Different registered option', description = 'Keep me' WHERE id = 32;
+      DELETE FROM options WHERE id = 33;
+      INSERT INTO options (id, comment, description, read_only, category, type, value)
+      VALUES (1000, 'Permanent Poison', 'Same name at another ID', 1, 'challenge', 'word', '1');
+    `);
+    const before = rows(database);
+    const expected = reviewedRows(database);
+    for (const id of [31, 32]) expected.find(row => row.id === id).description = before.find(row => row.id === id).description;
+    await initializeOptionsCatalog(database, schema, noDump);
+    assert.deepEqual(rows(database), expected);
+  } finally { database.close(); }
+});
+
+test('failed description migration rolls back all updates and retries without a completion record', async () => {
+  const database = new DatabaseSync(':memory:');
+  try {
+    database.exec(dump);
+    const before = rows(database);
+    const expected = reviewedRows(database);
+    database.exec(`CREATE TRIGGER reject_description BEFORE UPDATE OF description ON options
+      WHEN OLD.id = 38 BEGIN SELECT RAISE(ABORT, 'Simulated migration failure'); END;`);
+    await assert.rejects(initializeOptionsCatalog(database, schema, noDump), /Simulated migration failure/);
+    assert.deepEqual(rows(database), before, 'Earlier updates in the migration must roll back');
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM options_migrations').get().count, 0);
+    database.exec('DROP TRIGGER reject_description');
+    await initializeOptionsCatalog(database, schema, noDump);
+    assert.deepEqual(rows(database), expected);
+    assert.equal(database.prepare('SELECT id FROM options_migrations').get().id, descriptionMigration);
+  } finally { database.close(); }
+});
+
+test('installer includes the SQL migration and its parent directory', () => {
+  const { packagerConfig } = require('../forge.config.cjs');
+  for (const file of ['/database', '/database/migrations', `/database/migrations/${descriptionMigration}`]) {
+    assert.equal(packagerConfig.ignore(file), false, `${file} must be packaged`);
+  }
+  assert.equal(packagerConfig.ignore('/database/options.sqlite'), true);
 });
 
 test('an invalid snapshot leaves first installation retryable', async () => {

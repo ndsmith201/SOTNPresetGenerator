@@ -267,14 +267,19 @@ test('sharing strips local option fields and accepts an updated preset with its 
   assert.equal(submitted.length, 2);
 });
 
-test('preset author rejection is surfaced without retrying or creating a duplicate', async () => {
+test('preset and option author rejection asks for a new name without retrying', async () => {
   let calls = 0;
   const client = new CommunityClient(DEFAULT_COMMUNITY_CONFIG, async () => 'access-token', async () => {
     calls++;
     return response({ error: { code: 'forbidden', message: 'A preset with this name exists; only its listed authors can update it.' } }, 403);
   });
-  await assert.rejects(client.create('presets', JSON.stringify(item('presets').data)), /only its listed authors/);
-  assert.equal(calls, 1);
+  for (const [kind, subject] of [['presets', 'a preset'], ['options', 'an option']]) {
+    await assert.rejects(client.create(kind, JSON.stringify(item(kind).data)), {
+      status: 403,
+      message: `There is already ${subject} with that name and you are not the author. Please choose a new name.`
+    });
+  }
+  assert.equal(calls, 2);
 });
 
 
