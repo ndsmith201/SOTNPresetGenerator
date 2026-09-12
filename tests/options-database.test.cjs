@@ -6,10 +6,16 @@ const os = require('node:os');
 const path = require('node:path');
 const { deleteUserOption, initializeOptionsCatalog } = require('../dist/options-database');
 const { exportOptions, validateDump } = require('../scripts/export-options.cjs');
+const { optionWrites } = require('../dist/option-writes');
 
 const schema = readFileSync(path.join(__dirname, '../database/schema.sql'), 'utf8');
 const dump = readFileSync(path.join(__dirname, '../database/options-dump.sql'), 'utf8');
-const rows = database => database.prepare('SELECT * FROM options ORDER BY id').all();
+const rows = database => database.prepare('SELECT * FROM options ORDER BY id').all().map(row => {
+  // Account for the newly backfilled column when comparing legacy snapshots.
+  row.writes_json ??= JSON.stringify(optionWrites({ ...row, rawJson: !!row.raw_json,
+    primaryWrite: JSON.parse(row.primary_write_json || 'null'), additionalWrites: JSON.parse(row.additional_writes_json || '[]') }));
+  return row;
+});
 const descriptionMigration = '001-built-in-option-descriptions.sql';
 const reviewedDescriptions = new Map([
   [31, "Death won't take Alucard's gear"],
@@ -160,6 +166,7 @@ test('export includes committed WAL data, escaped text, IDs and sequence without
     source.prepare('INSERT INTO options (id, comment, description, category, type, value, read_only, additional_writes_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(7, "Author's option ☾", 'Line one\nLine two\0end', 'gameplay', 'word', '0x1234', 0, '[{"comment":"Quoted \\\"value\\\""}]');
     source.exec("INSERT INTO options (id, comment, category, type, value) VALUES (99, 'Deleted', 'world', 'word', '1'); DELETE FROM options WHERE id = 99;");
+    source.prepare('UPDATE options SET writes_json = ? WHERE id = 7').run(JSON.stringify([{ type: 'word', value: 0, comment: 'First note', extra: { keep: true } }, { type: 'short', value: '2', address: '0x1000' }]));
     source.exec("INSERT INTO write_options (id, label, category) VALUES ('private', 'Do not export', 'world')");
     const before = rows(source);
     assert.equal(exportOptions(sourcePath, destination), 1);

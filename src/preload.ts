@@ -1,3 +1,4 @@
+import type { CreateOptionInput } from "./renderer/types";
 import type { UpdateApi, UpdateState } from "./update-types";
 import { contextBridge, ipcRenderer } from "electron";
 import type { SuccessfulExport } from "./renderer/export-state";
@@ -13,32 +14,8 @@ export interface PresetAppApi {
   listInstalledPresets: (sotnRandoPath: string) => Promise<unknown>;
   listOptions: () => Promise<unknown>;
   deleteOption: (id: number) => Promise<unknown>;
-  createOption: (request: {
-    comment: string;
-    description?: string;
-    category: string;
-    type: string;
-    value: string;
-    address?: string;
-    gameInit?: boolean;
-    statEdit?: boolean;
-    rawJson?: boolean;
-    additionalWrites?: Record<string, unknown>[];
-    primaryWrite?: Record<string, unknown>;
-  }) => Promise<unknown>;
-  updateOption: (id: number, request: {
-    comment: string;
-    description?: string;
-    category: string;
-    type: string;
-    value: string;
-    address?: string;
-    gameInit?: boolean;
-    statEdit?: boolean;
-    rawJson?: boolean;
-    additionalWrites?: Record<string, unknown>[];
-    primaryWrite?: Record<string, unknown>;
-  }) => Promise<unknown>;
+  createOption: (request: CreateOptionInput) => Promise<unknown>;
+  updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
   exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
   getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;

@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { optionWrites } from "./option-writes";
 
 // Keep applied migrations immutable; append a new file for future catalog changes.
 const catalogMigrations = ["001-built-in-option-descriptions.sql"];
@@ -21,6 +22,7 @@ export async function initializeOptionsCatalog(
       migrateOptionsCategories(validation);
       validation.exec(schema);
       migrateOptionalWriteFields(validation);
+      migrateUnifiedWrites(validation);
       validation.prepare("SELECT id, comment, read_only FROM options").all();
       await migrateOptionsData(validation);
     } finally {
@@ -36,7 +38,29 @@ export async function initializeOptionsCatalog(
   migrateOptionsCategories(database);
   database.exec(schema);
   migrateOptionalWriteFields(database);
+  migrateUnifiedWrites(database);
   await migrateOptionsData(database);
+}
+
+function migrateUnifiedWrites(database: DatabaseSync): void {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const columns = database.prepare("PRAGMA table_info(options)").all();
+    if (!columns.some(column => column.name === "writes_json")) {
+      database.exec("ALTER TABLE options ADD COLUMN writes_json TEXT CHECK (writes_json IS NULL OR (json_valid(writes_json) AND json_type(writes_json) = 'array'))");
+    }
+    const save = database.prepare("UPDATE options SET writes_json = ? WHERE id = ?");
+    for (const row of database.prepare("SELECT * FROM options WHERE writes_json IS NULL").all()) {
+      const writes = optionWrites({ ...row, rawJson: Boolean(row.raw_json),
+        primaryWrite: row.primary_write_json ? JSON.parse(String(row.primary_write_json)) : undefined,
+        additionalWrites: row.additional_writes_json ? JSON.parse(String(row.additional_writes_json)) : [] });
+      save.run(JSON.stringify(writes), row.id);
+    }
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 async function migrateOptionsData(database: DatabaseSync): Promise<void> {
@@ -81,6 +105,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
   const rawJsonExpression = columns.has("raw_json") ? "raw_json" : "0";
   const additionalWritesExpression = columns.has("additional_writes_json") ? "additional_writes_json" : "NULL";
   const primaryWriteExpression = columns.has("primary_write_json") ? "primary_write_json" : "NULL";
+  const writesExpression = columns.has("writes_json") ? "writes_json" : "NULL";
 
   database.exec(`
     PRAGMA foreign_keys = OFF;
@@ -99,6 +124,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
       raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
       primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),
+      writes_json TEXT CHECK (writes_json IS NULL OR (json_valid(writes_json) AND json_type(writes_json) = 'array')),
       additional_writes_json TEXT CHECK (
         additional_writes_json IS NULL OR
         (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array')
@@ -106,8 +132,8 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json, created_at, updated_at)
-    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, ${primaryWriteExpression}, created_at, updated_at
+    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json, writes_json, created_at, updated_at)
+    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, ${primaryWriteExpression}, ${writesExpression}, created_at, updated_at
     FROM options_before_relic_category;
     DROP TABLE options_before_relic_category;
     COMMIT;

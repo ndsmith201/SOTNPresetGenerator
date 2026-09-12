@@ -1,4 +1,5 @@
 import { WRITE_TYPES } from "./constants";
+import { optionWrites } from "../option-writes";
 import type { CreateOptionInput, DatabaseOption, OptionCategory, WriteEntry, WriteType } from "./types";
 
 export type WritePlacement = "default" | "game-init" | "after-relics";
@@ -16,12 +17,9 @@ export function optionDraft(option?: DatabaseOption | null): OptionDraft {
   return {
     comment: option?.comment ?? "", description: option?.description ?? "",
     category: option?.category ?? "world", rawJson: option?.rawJson ?? false,
-    json: option?.rawJson ? option.value : '{\n  "enemyDrops": true\n}',
+    json: option?.rawJson ? option.value ?? "{}" : '{\n  "enemyDrops": true\n}',
     placement: option?.gameInit ? "game-init" : option?.statEdit ? "after-relics" : "default",
-    writes: option && !option.rawJson ? structuredClone([
-      option.primaryWrite ?? { type: option.type, value: option.value, comment: option.comment, ...(option.address ? { address: option.address } : {}) },
-      ...option.additionalWrites
-    ]) : [{ type: "word", value: "" }]
+    writes: option && !option.rawJson ? optionWrites(option) : [{ type: "word", value: "" }]
   };
 }
 
@@ -60,12 +58,10 @@ export function draftInput(draft: OptionDraft): CreateOptionInput {
     let parsed: unknown;
     try { parsed = JSON.parse(draft.json); } catch { throw new Error("Enter valid JSON settings."); }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("JSON settings must be an object.");
-    return { ...common, type: "word", value: draft.json.trim(), rawJson: true };
+    return { ...common, value: draft.json.trim(), rawJson: true, writes: [] };
   }
-  const [primaryWrite, ...additionalWrites] = normalizeWrites(draft.writes);
   return {
-    ...common, type: primaryWrite.type as WriteType, value: String(primaryWrite.value),
-    ...(primaryWrite.address ? { address: primaryWrite.address as string } : {}), primaryWrite, additionalWrites,
+    ...common, writes: normalizeWrites(draft.writes),
     ...(draft.placement === "game-init" ? { gameInit: true } : draft.placement === "after-relics" ? { statEdit: true } : {})
   };
 }

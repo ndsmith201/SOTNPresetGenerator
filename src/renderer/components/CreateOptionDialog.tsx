@@ -67,7 +67,7 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
   let input: CreateOptionInput | null = null;
   let validation = "";
   try { input = draftInput(draft); } catch (issue) { validation = issue instanceof Error ? issue.message : "Check your option fields."; }
-  const preview = input ? (input.rawJson ? JSON.parse(input.value) : { writes: [input.primaryWrite, ...(input.additionalWrites ?? [])] }) : null;
+  const preview = input ? (input.rawJson ? JSON.parse(input.value!) : { writes: input.writes }) : null;
 
   const continueToEditor = () => {
     if (start === "copy" && !source) return;
@@ -134,7 +134,7 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
                 <input type="radio" name="sourceOption" checked={sourceId === item.id} onChange={() => setSourceId(item.id)} />
                 <span><strong>{item.comment}</strong><small>{item.description || "Reusable preset option"}</small></span>
                 <span className="builder-badge">{OPTION_GROUPS.find(group => group.id === item.category)?.label}</span>
-                <span className="builder-badge">{item.rawJson ? "JSON settings" : `${1 + item.additionalWrites.length} writes`}</span>
+                <span className="builder-badge">{item.rawJson ? "JSON settings" : `${item.writes.length} writes`}</span>
               </label>)}
               {!results.length && <p className="builder-empty">{options.length ? "No matching options. Try another search." : "No options to copy yet. Start with a memory patch or JSON settings."}</p>}
             </div>

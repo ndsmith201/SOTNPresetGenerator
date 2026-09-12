@@ -30,7 +30,7 @@ function validateDump(sql) {
       current.exec(readFileSync(path.join(root, 'database/schema.sql'), 'utf8'));
       // Older installed catalogs omit optional columns introduced by migrations.
       const sourceColumns = new Set(database.prepare('PRAGMA table_info(options)').all().map(column => column.name));
-      const columns = current.prepare('PRAGMA table_info(options)').all().map(column => column.name).filter(name => name !== 'primary_write_json' || sourceColumns.has(name));
+      const columns = current.prepare('PRAGMA table_info(options)').all().map(column => column.name).filter(name => !['primary_write_json', 'writes_json'].includes(name) || sourceColumns.has(name));
       const rows = database.prepare(`SELECT ${columns.map(quoteIdentifier).join(', ')} FROM options ORDER BY id`).all();
       const insert = current.prepare(`INSERT INTO options (${columns.map(quoteIdentifier).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`);
       for (const row of rows) insert.run(...columns.map(column => row[column]));

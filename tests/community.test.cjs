@@ -13,7 +13,7 @@ const { optionSubmission } = require('../dist/community-options');
 const { BuiltPresetStore } = require('../dist/preset-generation');
 
 const id = '0123456789abcdef0123456789abcdef';
-const data = { comment: 'Library shortcut', description: '', category: 'gameplay', type: 'string', value: '{"libraryShortcut":true}', address: null, gameInit: false, statEdit: false, rawJson: true, additionalWrites: [] };
+const data = { comment: 'Library shortcut', description: '', category: 'gameplay', value: '{"libraryShortcut":true}', gameInit: false, statEdit: false, rawJson: true, writes: [] };
 const item = (kind = 'options', values = {}) => ({ id, kind, createdBy: 'alice', createdAt: '2026-09-09T20:00:00Z', upvotes: 0, downvotes: 0, score: 0, data: kind === 'options' ? data : { metadata: { id: 'example', name: 'Example' }, music: false }, ...values });
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status });
 function storage() {
@@ -271,11 +271,11 @@ test('sharing strips local option fields and accepts an updated preset with its 
 test('sharing an authored memory option sends only API fields and preserves its local first write', async t => {
   const database = new DatabaseSync(':memory:'); t.after(() => database.close());
   const primaryWrite = { type: 'word', value: 0, address: '0x1234', comment: 'First write note', custom: { keep: true } };
-  const local = { ...data, id: 42, readOnly: false, comment: 'My memory patch', type: 'word', value: '0', address: '0x1234', rawJson: false, gameInit: true,
-    primaryWrite, additionalWrites: [{ type: 'short', value: '1', comment: 'Next write' }] };
+  const local = { id: 42, readOnly: false, comment: 'My memory patch', description: '', category: 'gameplay', rawJson: false, gameInit: true,
+    writes: [primaryWrite, { type: 'short', value: '1', comment: 'Next write' }] };
   const original = structuredClone(local);
-  const { id: _id, readOnly: _readOnly, primaryWrite: _primaryWrite, ...expected } = local;
-  const supported = new Set(['comment', 'description', 'category', 'type', 'value', 'address', 'gameInit', 'statEdit', 'rawJson', 'additionalWrites']);
+  const { id: _id, readOnly: _readOnly, ...expected } = local;
+  const supported = new Set(['comment', 'description', 'category', 'value', 'gameInit', 'statEdit', 'rawJson', 'writes']);
   const store = storage(); store.write('config', JSON.stringify({ ...DEFAULT_COMMUNITY_CONFIG, apiUrl: 'http://localhost:8080', devUser: 'alice' }));
   let posted;
   const service = new CommunityService({ database, storage: store, builds: new BuiltPresetStore(), createOption() { throw new Error('Unexpected import'); }, loadOption: () => local,
