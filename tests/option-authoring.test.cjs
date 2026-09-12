@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');
+const path = require('node:path');
 const { optionDraft, draftInput, normalizeWrites, parseWriteSource } = require('../dist/renderer/option-authoring');
 const { toPresetOptions } = require('../dist/renderer/preset-utils');
 const { initializeOptionsCatalog } = require('../dist/options-database');
@@ -9,6 +10,7 @@ const { optionSubmission } = require('../dist/community-options');
 
 const base = { id: 1, readOnly: true, comment: 'Source', description: 'Original', category: 'gameplay', type: 'word', value: '0x34020063', address: null, gameInit: false, statEdit: true, rawJson: false, additionalWrites: [{ type: 'short', value: 0, address: '0x1234', comment: 'Independent note', custom: { keep: true } }] };
 const stored = input => ({ id: 2, readOnly: false, address: null, gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...input });
+const legacyCatalog = fs.readFileSync(path.join(__dirname, 'fixtures/legacy-options.sql'), 'utf8');
 
 test('copy, reorder, save and reopen preserve per-write addresses, notes and extra fields', () => {
   const original = structuredClone(base);
@@ -73,10 +75,11 @@ test('placement choices are exclusive and JSON mode excludes write-specific fiel
 test('older catalogs migrate all writes without changing existing data and preserve the array on later launches', async () => {
   const db = new DatabaseSync(':memory:');
   try {
-    db.exec(fs.readFileSync('database/options-dump.sql', 'utf8'));
-    // Build a legacy catalog independently of the snapshot's SQL formatting.
+    db.exec(legacyCatalog);
+    // Model the older version that predates both first-write metadata and writes_json.
     db.exec('ALTER TABLE options DROP COLUMN primary_write_json');
     assert.equal(db.prepare('PRAGMA table_info(options)').all().some(column => column.name === 'primary_write_json'), false);
+    assert.equal(db.prepare('PRAGMA table_info(options)').all().some(column => column.name === 'writes_json'), false);
     const before = db.prepare('SELECT comment, value, address, additional_writes_json FROM options').all();
     const schema = fs.readFileSync('database/schema.sql', 'utf8');
     await initializeOptionsCatalog(db, schema, async () => { throw new Error('Do not reload existing catalog'); });
@@ -91,11 +94,17 @@ test('older catalogs migrate all writes without changing existing data and prese
   } finally { db.close(); }
 });
 
-test('migration retains independent first-write properties and unified arrays across restarts', async () => {
+for (const existingWritesColumn of [false, true]) test(`migration retains independent first-write properties and unified arrays across restarts (${existingWritesColumn ? 'null' : 'missing'} writes_json)`, async () => {
   const db = new DatabaseSync(':memory:');
   const restored = new DatabaseSync(':memory:');
   try {
-    db.exec(fs.readFileSync('database/options-dump.sql', 'utf8'));
+    db.exec(legacyCatalog);
+    if (existingWritesColumn) {
+      db.exec('ALTER TABLE options ADD COLUMN writes_json TEXT');
+      assert.equal(db.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json, null);
+    } else {
+      assert.equal(db.prepare('PRAGMA table_info(options)').all().some(column => column.name === 'writes_json'), false);
+    }
     const primary = { type: 'word', value: 0, comment: 'Independent first note', extra: { keep: true } };
     const next = { type: 'short', value: '1', address: '0x1234', comment: 'Next note' };
     db.prepare('UPDATE options SET primary_write_json = ?, additional_writes_json = ? WHERE id = 1').run(JSON.stringify(primary), JSON.stringify([next]));
@@ -106,8 +115,7 @@ test('migration retains independent first-write properties and unified arrays ac
     const option = { ...base, writes };
     assert.deepEqual(optionSubmission(option).writes, [primary, next]);
     assert.deepEqual(toPresetOptions([option])[0].injectedWrites, [primary, next]);
-    const dump = fs.readFileSync('database/options-dump.sql', 'utf8');
-    await initializeOptionsCatalog(restored, schema, async () => dump);
+    await initializeOptionsCatalog(restored, schema, async () => legacyCatalog);
     restored.prepare('UPDATE options SET writes_json = ? WHERE id = 1').run(JSON.stringify(writes));
     await initializeOptionsCatalog(restored, schema, async () => { throw new Error('No reload'); });
     assert.deepEqual(JSON.parse(restored.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json), [primary, next]);
