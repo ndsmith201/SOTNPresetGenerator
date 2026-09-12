@@ -68,8 +68,10 @@ test('placement choices are exclusive and JSON mode excludes write-specific fiel
 test('older catalogs migrate primary-write storage without changing existing data and preserve it on later launches', async () => {
   const db = new DatabaseSync(':memory:');
   try {
-    const dump = fs.readFileSync('database/options-dump.sql', 'utf8').replace(/^.*primary_write_json.*\r?\n/m, '');
-    db.exec(dump);
+    db.exec(fs.readFileSync('database/options-dump.sql', 'utf8'));
+    // Build a legacy catalog independently of the snapshot's SQL formatting.
+    db.exec('ALTER TABLE options DROP COLUMN primary_write_json');
+    assert.equal(db.prepare('PRAGMA table_info(options)').all().some(column => column.name === 'primary_write_json'), false);
     const before = db.prepare('SELECT comment, value, address, additional_writes_json FROM options').all();
     const schema = fs.readFileSync('database/schema.sql', 'utf8');
     await initializeOptionsCatalog(db, schema, async () => { throw new Error('Do not reload existing catalog'); });
