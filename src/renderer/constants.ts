@@ -1,8 +1,6 @@
 import type { BuiltInSettings, MetaExtension, OptionCategory, WriteType } from "./types";
 
 export const STORAGE_KEY = "sotn-preset-generator.presets.v1";
-export const COMPACT_MODE_KEY = "sotn-preset-generator.compact-mode";
-export const JSON_WRAP_KEY = "sotn-preset-generator.json-wrap";
 export const SOTNRANDO_PATH_KEY = "sotn-preset-generator.sotnrando-path";
 export const PRESET_AUTHOR_KEY = "sotn-preset-generator.author";
 export const MIN_COMPLEXITY = 1;

@@ -1,6 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
-/** Import the release catalog once; later launches only migrate the user's schema. */
+// Keep applied migrations immutable; append a new file for future catalog changes.
+const catalogMigrations = ["001-built-in-option-descriptions.sql"];
+
+/** Import the release catalog once, then apply schema and versioned data migrations. */
 export async function initializeOptionsCatalog(
   database: DatabaseSync,
   schema: string,
@@ -17,6 +22,7 @@ export async function initializeOptionsCatalog(
       validation.exec(schema);
       migrateOptionalWriteFields(validation);
       validation.prepare("SELECT id, comment, read_only FROM options").all();
+      await migrateOptionsData(validation);
     } finally {
       validation.close();
     }
@@ -30,6 +36,32 @@ export async function initializeOptionsCatalog(
   migrateOptionsCategories(database);
   database.exec(schema);
   migrateOptionalWriteFields(database);
+  await migrateOptionsData(database);
+}
+
+async function migrateOptionsData(database: DatabaseSync): Promise<void> {
+  database.exec(`CREATE TABLE IF NOT EXISTS options_migrations (
+    id TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  const applied = database.prepare("SELECT 1 FROM options_migrations WHERE id = ?");
+  const record = database.prepare("INSERT INTO options_migrations (id) VALUES (?)");
+  for (const id of catalogMigrations) {
+    if (applied.get(id)) continue;
+    const sql = await readFile(path.join(__dirname, "../database/migrations", id), "utf8");
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      // Recheck under the write lock in case another app instance migrated first.
+      if (!applied.get(id)) {
+        database.exec(sql);
+        record.run(id);
+      }
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  }
 }
 
 function migrateOptionsCategories(database: DatabaseSync): void {
@@ -48,6 +80,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
   const statEditExpression = columns.has("stat_edit") ? "stat_edit" : "0";
   const rawJsonExpression = columns.has("raw_json") ? "raw_json" : "0";
   const additionalWritesExpression = columns.has("additional_writes_json") ? "additional_writes_json" : "NULL";
+  const primaryWriteExpression = columns.has("primary_write_json") ? "primary_write_json" : "NULL";
 
   database.exec(`
     PRAGMA foreign_keys = OFF;
@@ -65,6 +98,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
       stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
       raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
+      primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),
       additional_writes_json TEXT CHECK (
         additional_writes_json IS NULL OR
         (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array')
@@ -72,8 +106,8 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, created_at, updated_at)
-    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, created_at, updated_at
+    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json, created_at, updated_at)
+    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, ${primaryWriteExpression}, created_at, updated_at
     FROM options_before_relic_category;
     DROP TABLE options_before_relic_category;
     COMMIT;
@@ -85,6 +119,9 @@ function migrateOptionalWriteFields(database: DatabaseSync): void {
   const columns = new Set(
     (database.prepare("PRAGMA table_info(options)").all() as unknown as { name: string }[]).map((column) => column.name)
   );
+  if (!columns.has("primary_write_json")) {
+    database.exec("ALTER TABLE options ADD COLUMN primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object'))");
+  }
   if (!columns.has("address")) {
     database.exec(
       "ALTER TABLE options ADD COLUMN address TEXT CHECK (address IS NULL OR length(trim(address)) > 0)"

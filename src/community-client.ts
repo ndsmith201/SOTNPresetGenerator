@@ -108,7 +108,15 @@ export class CommunityClient {
     return validateItem(await this.request(`/v1/${validateKind(kind)}/${validateCatalogId(id)}`), kind);
   }
   async create(kind: CatalogKind, json: string): Promise<CatalogItem> {
-    return validateItem(await this.request(`/v1/${validateKind(kind)}`, "POST", json), kind);
+    try {
+      return validateItem(await this.request(`/v1/${validateKind(kind)}`, "POST", json), kind);
+    } catch (error) {
+      if (error instanceof CommunityHttpError && error.status === 403) {
+        const subject = kind === "presets" ? "a preset" : "an option";
+        throw new CommunityHttpError(403, `There is already ${subject} with that name and you are not the author. Please choose a new name.`);
+      }
+      throw error;
+    }
   }
   async vote(kind: CatalogKind, id: string, value: number): Promise<CatalogItem> {
     if (![-1, 0, 1].includes(value)) throw new Error("Choose upvote, downvote, or remove vote.");

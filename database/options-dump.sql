@@ -13,6 +13,7 @@ CREATE TABLE options (
   address TEXT CHECK (address IS NULL OR length(trim(address)) > 0),
   game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
   raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
+  primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),
   additional_writes_json TEXT CHECK (
     additional_writes_json IS NULL OR
     (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array')

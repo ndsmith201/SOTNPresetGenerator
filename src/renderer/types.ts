@@ -68,6 +68,7 @@ export interface DatabaseOption {
   statEdit: boolean;
   rawJson: boolean;
   additionalWrites: WriteEntry[];
+  primaryWrite?: WriteEntry;
 }
 
 export interface PresetOption {
@@ -93,6 +94,7 @@ export interface CreateOptionInput {
   statEdit?: boolean;
   rawJson?: boolean;
   additionalWrites?: WriteEntry[];
+  primaryWrite?: WriteEntry;
 }
 
 export interface PresetAppApi {

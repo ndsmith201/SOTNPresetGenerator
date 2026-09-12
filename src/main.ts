@@ -40,9 +40,11 @@ interface StoredOption {
   statEdit: boolean;
   rawJson: boolean;
   additionalWrites: Record<string, unknown>[];
+  primaryWrite?: Record<string, unknown>;
 }
 
-interface StoredOptionRow extends Omit<StoredOption, "additionalWrites" | "gameInit" | "statEdit" | "rawJson" | "readOnly"> {
+interface StoredOptionRow extends Omit<StoredOption, "primaryWrite" | "additionalWrites" | "gameInit" | "statEdit" | "rawJson" | "readOnly"> {
+  primary_write_json: string | null;
   read_only: number;
   game_init: number;
   stat_edit: number;
@@ -75,7 +77,7 @@ async function initializeOptionsDatabase(): Promise<void> {
 function listOptions(): StoredOption[] {
   const rows = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json FROM options ORDER BY category, comment, id"
+      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json FROM options ORDER BY category, comment, id"
     )
     .all() as unknown as StoredOptionRow[];
   return rows.map(hydrateStoredOption);
@@ -89,8 +91,8 @@ function hydrateStoredOption(row: StoredOptionRow): StoredOption {
       additionalWrites = parsed.filter(isRecord);
     }
   }
-  const { read_only: readOnly, game_init: gameInit, stat_edit: statEdit, raw_json: rawJson, additional_writes_json: _additionalWritesJson, ...option } = row;
-  return { ...option, readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), additionalWrites };
+  const { primary_write_json: primarySource, read_only: readOnly, game_init: gameInit, stat_edit: statEdit, raw_json: rawJson, additional_writes_json: _additionalWritesJson, ...option } = row;
+  return { ...option, ...(primarySource ? { primaryWrite: JSON.parse(primarySource) } : {}), readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), additionalWrites };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -141,13 +143,19 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   const gameInit = rawJson ? false : requestedGameInit;
   const statEdit = rawJson || gameInit ? false : requestedStatEdit;
   const additionalWrites = rawJson ? [] : requestedAdditionalWrites;
-  return { comment, description, category: category as OptionCategory, type: type as WriteType, value, address, gameInit, statEdit, rawJson, additionalWrites };
+  const primaryWrite = rawJson ? undefined : candidate.primaryWrite;
+  if (primaryWrite !== undefined) {
+    if (!isRecord(primaryWrite) || primaryWrite.type !== type || String(primaryWrite.value) !== value || (primaryWrite.address ?? null) !== address) {
+      throw new Error("The first write must match the option's type, value, and address.");
+    }
+  }
+  return { comment, description, category: category as OptionCategory, type: type as WriteType, value, address, gameInit, statEdit, rawJson, additionalWrites, ...(primaryWrite ? { primaryWrite: primaryWrite as Record<string, unknown> } : {}) };
 }
 
 function loadOption(id: number): StoredOption {
   const row = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json FROM options WHERE id = ?"
+      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json FROM options WHERE id = ?"
     )
     .get(id) as unknown as StoredOptionRow | undefined;
   if (!row) throw new Error("The option could not be found.");
@@ -160,9 +168,9 @@ function createOption(request: unknown): StoredOption {
 
   const result = getOptionsDatabase()
     .prepare(
-      "INSERT INTO options (comment, description, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO options (comment, description, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson);
+    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson, option.primaryWrite ? JSON.stringify(option.primaryWrite) : null);
   return loadOption(Number(result.lastInsertRowid));
 }
 
@@ -173,9 +181,9 @@ function updateOption(id: unknown, request: unknown): StoredOption {
   const additionalWritesJson = option.additionalWrites.length > 0 ? JSON.stringify(option.additionalWrites) : null;
   const result = getOptionsDatabase()
     .prepare(
-      "UPDATE options SET comment = ?, description = ?, category = ?, type = ?, value = ?, address = ?, game_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
+      "UPDATE options SET comment = ?, description = ?, category = ?, type = ?, value = ?, address = ?, game_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = ?, primary_write_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
     )
-    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson, id);
+    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson, option.primaryWrite ? JSON.stringify(option.primaryWrite) : null, id);
   if (result.changes !== 1) throw new Error("The option could not be found.");
   return loadOption(id);
 }
