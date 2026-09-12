@@ -61,14 +61,11 @@ export interface DatabaseOption {
   comment: string;
   description: string;
   category: OptionCategory;
-  type: WriteType;
-  value: string;
-  address: string | null;
+  value?: string;
   gameInit: boolean;
   statEdit: boolean;
   rawJson: boolean;
-  additionalWrites: WriteEntry[];
-  primaryWrite?: WriteEntry;
+  writes: WriteEntry[];
 }
 
 export interface PresetOption {
@@ -87,14 +84,11 @@ export interface CreateOptionInput {
   comment: string;
   description?: string;
   category: OptionCategory;
-  type: WriteType;
-  value: string;
-  address?: string;
+  value?: string;
   gameInit?: boolean;
   statEdit?: boolean;
   rawJson?: boolean;
-  additionalWrites?: WriteEntry[];
-  primaryWrite?: WriteEntry;
+  writes: WriteEntry[];
 }
 
 export interface PresetAppApi {

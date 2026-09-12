@@ -1,4 +1,5 @@
 import type { CatalogItem, CatalogKind, CatalogPage, CommunityConfig } from "./community-types";
+import { unifiedOption } from "./option-writes";
 
 // Public deployment settings from SOTNPresetAPI/bruno/api/environments/AWS.bru.
 export const DEFAULT_COMMUNITY_CONFIG: CommunityConfig = {
@@ -33,7 +34,11 @@ export function validateItem(value: unknown, kind: CatalogKind): CatalogItem {
       ![value.upvotes, value.downvotes, value.score].every(Number.isSafeInteger) || Number(value.upvotes) < 0 || Number(value.downvotes) < 0) throw new Error("The community API returned an invalid item.");
   validateCatalogId(value.id);
   if (kind === "presets" && (!isRecord(value.data.metadata) || typeof value.data.metadata.name !== "string" || typeof value.data.metadata.id !== "string")) throw new Error("The community preset has invalid metadata.");
-  if (kind === "options" && (typeof value.data.comment !== "string" || typeof value.data.value !== "string")) throw new Error("The community option is invalid.");
+  if (kind === "options") {
+    const option = unifiedOption(value.data);
+    if (typeof option.comment !== "string" || (option.rawJson ? typeof option.value !== "string" : !(option.writes as unknown[]).length)) throw new Error("The community option is invalid.");
+    return { ...value, data: option } as unknown as CatalogItem;
+  }
   return value as unknown as CatalogItem;
 }
 

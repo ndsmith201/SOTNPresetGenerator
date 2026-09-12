@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS options (
   stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
   raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
   primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),
+  writes_json TEXT CHECK (writes_json IS NULL OR (json_valid(writes_json) AND json_type(writes_json) = 'array')),
   additional_writes_json TEXT CHECK (
     additional_writes_json IS NULL OR
     (json_valid(additional_writes_json) AND json_type(additional_writes_json) = 'array')

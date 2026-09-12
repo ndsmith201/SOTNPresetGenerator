@@ -194,7 +194,11 @@ Registered options are read-only: use the eye button to inspect and select/copy 
 
 Viewing a community option uses the same editor layout as creating an option: mode icons, write rows with individual addresses, placement, and JSON preview. All definition fields are read-only, while values remain selectable and JSON sections can be expanded. Community voting and **Add to my options** remain in the header.
 
-The catalog adds an optional `primary_write_json` field on startup to preserve independent notes and extra properties on the first write. Existing definitions keep their original output, and older release snapshots remain supported.
+Options use one ordered `writes` array throughout the editor, preset generation, and community sharing. Every write carries its own type, value, optional address, note, and extra properties, including the first write. JSON settings use an empty array and keep their JSON object in `value`.
+
+On startup, the catalog fills `writes_json` from older top-level write fields, `primary_write_json`, and `additional_writes_json`, preserving order and independent write properties. Existing arrays are left intact on later launches. Legacy database columns remain for snapshot migration compatibility; new edits store their complete sequence in `writes_json`. Older release snapshots remain supported.
+
+Publishing this format requires the matching SOTNPresetAPI update that accepts `writes`. Deploy that API change before releasing the desktop update.
 
 ## JSON preview and export
 

@@ -1,3 +1,4 @@
+import { unifiedOption } from "../option-writes";
 import {
   BUILT_IN_TOGGLES,
   DEFAULT_BUILT_IN_SETTINGS,
@@ -261,35 +262,30 @@ export function isDatabaseOption(value: unknown): value is DatabaseOption {
     typeof value.description === "string" &&
     typeof value.readOnly === "boolean" &&
     OPTION_GROUPS.some((group) => group.id === value.category) &&
-    typeof value.type === "string" &&
-    WRITE_TYPES.includes(value.type as DatabaseOption["type"]) &&
-    typeof value.value === "string" &&
-    (value.address === null || typeof value.address === "string") &&
+    (!value.rawJson || typeof value.value === "string") &&
     typeof value.gameInit === "boolean" &&
     typeof value.statEdit === "boolean" &&
     typeof value.rawJson === "boolean" &&
-    (value.primaryWrite === undefined || isJsonObject(value.primaryWrite)) &&
-    Array.isArray(value.additionalWrites) &&
-    value.additionalWrites.every(isJsonObject)
+    Array.isArray(value.writes) &&
+    value.writes.every(isJsonObject)
   );
 }
 
 export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption[] {
-  return databaseOptions.map((option) => {
+  return databaseOptions.map((input) => {
+    const option = unifiedOption(input) as unknown as DatabaseOption;
     let previewJson: JsonObject | null = null;
     if (option.rawJson) {
       try {
-        const parsed = JSON.parse(option.value) as unknown;
+        const parsed = JSON.parse(option.value!) as unknown;
         if (isJsonObject(parsed)) previewJson = parsed;
       } catch {
         previewJson = null;
       }
     }
-    const primaryWrite: WriteEntry = option.primaryWrite ? structuredClone(option.primaryWrite) : { comment: option.comment, type: option.type, value: option.value };
-    if (!option.primaryWrite && option.address) primaryWrite.address = option.address;
-    const writes = option.rawJson ? [] : [primaryWrite, ...option.additionalWrites.map((write) => structuredClone(write))];
+    const writes = option.writes;
     const injectRelicWrites = !option.rawJson && !option.gameInit &&
-      (option.statEdit || (option.category === "relics" && !option.address));
+      (option.statEdit || (option.category === "relics" && !writes[0]?.address));
     return {
       id: `option:${option.id}`,
       label: option.comment,

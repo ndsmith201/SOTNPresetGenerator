@@ -1,4 +1,6 @@
 import type { UpdateState } from "../update-types";
+import { optionSubmission } from "../community-options";
+import { unifiedOption } from "../option-writes";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -33,7 +35,7 @@ async function fetchOptions(): Promise<PresetOption[]> {
   if (!isJsonObject(response)) throw new Error("Invalid response from the options database.");
   if (response.status === "error" && typeof response.error === "string") throw new Error(response.error);
   if (response.status !== "ok" || !Array.isArray(response.options)) throw new Error("The options database returned invalid data.");
-  return toPresetOptions(response.options.filter(isDatabaseOption));
+  return toPresetOptions(response.options.map(option => isJsonObject(option) ? unifiedOption(option) : option).filter(isDatabaseOption));
 }
 
 export function App() {
@@ -169,7 +171,7 @@ export function App() {
   const communityOption = useMemo(() => {
     if (communityItem?.kind !== "options") return null;
     // Public definitions omit local IDs and can omit optional write fields.
-    const candidate = { description: "", address: null, gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...communityItem.data, id: 0, readOnly: true };
+    const candidate = unifiedOption({ description: "", gameInit: false, statEdit: false, rawJson: false, ...communityItem.data, id: 0, readOnly: true });
     return isDatabaseOption(candidate) ? candidate : null;
   }, [communityItem]);
 
@@ -435,7 +437,7 @@ export function App() {
       {optionToDelete && <DeleteOptionDialog option={optionToDelete} onClose={() => setOptionToDelete(null)} onDelete={deleteOption} />}
       <Toast message={toast} />
       {updateOpen && updateState && <UpdateDialog state={updateState} onLater={() => setUpdateDismissed(true)} onRestart={restartForUpdate} />}
-      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : Object.fromEntries(Object.entries(shareTarget.source).filter(([key]) => key !== "id" && key !== "readOnly"))} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
+      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : optionSubmission(shareTarget.source)} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
       {loginOpen && <LoginDialog onClose={() => { setLoginOpen(false); setVotes({}); afterLogin.current = null; }} onSignedIn={() => { setLoginOpen(false); setVotes({}); const next = afterLogin.current; afterLogin.current = null; next?.(); }} />}
     </>
   );

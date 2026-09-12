@@ -12,6 +12,7 @@ import { listInstalledPresets, writeNewPreset } from "./installed-presets";
 import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-randomizer";
 import { BuiltPresetStore, generatePatch } from "./preset-generation";
 import { CommunityService } from "./community-service";
+import { optionWrites, unifiedOption } from "./option-writes";
 import { AppUpdater } from "./app-updater";
 import type { CommunityRequest } from "./community-types";
 
@@ -28,28 +29,14 @@ type OptionCategory = (typeof OPTION_CATEGORIES)[number];
 type WriteType = (typeof WRITE_TYPES)[number];
 
 interface StoredOption {
-  id: number;
-  comment: string;
-  description: string;
-  readOnly: boolean;
-  category: OptionCategory;
-  type: WriteType;
-  value: string;
-  address: string | null;
-  gameInit: boolean;
-  statEdit: boolean;
-  rawJson: boolean;
-  additionalWrites: Record<string, unknown>[];
-  primaryWrite?: Record<string, unknown>;
+  id: number; comment: string; description: string; readOnly: boolean;
+  category: OptionCategory; value?: string; gameInit: boolean; statEdit: boolean;
+  rawJson: boolean; writes: Record<string, unknown>[];
 }
-
-interface StoredOptionRow extends Omit<StoredOption, "primaryWrite" | "additionalWrites" | "gameInit" | "statEdit" | "rawJson" | "readOnly"> {
-  primary_write_json: string | null;
-  read_only: number;
-  game_init: number;
-  stat_edit: number;
-  raw_json: number;
-  additional_writes_json: string | null;
+interface StoredOptionRow {
+  id: number; comment: string; description: string; category: OptionCategory;
+  value: string; read_only: number; game_init: number; stat_edit: number;
+  raw_json: number; writes_json: string;
 }
 
 let optionsDatabase: DatabaseSync | null = null;
@@ -77,22 +64,15 @@ async function initializeOptionsDatabase(): Promise<void> {
 function listOptions(): StoredOption[] {
   const rows = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json FROM options ORDER BY category, comment, id"
+      "SELECT id, comment, description, read_only, category, value, game_init, stat_edit, raw_json, writes_json FROM options ORDER BY category, comment, id"
     )
     .all() as unknown as StoredOptionRow[];
   return rows.map(hydrateStoredOption);
 }
 
 function hydrateStoredOption(row: StoredOptionRow): StoredOption {
-  let additionalWrites: Record<string, unknown>[] = [];
-  if (row.additional_writes_json) {
-    const parsed = JSON.parse(row.additional_writes_json) as unknown;
-    if (Array.isArray(parsed)) {
-      additionalWrites = parsed.filter(isRecord);
-    }
-  }
-  const { primary_write_json: primarySource, read_only: readOnly, game_init: gameInit, stat_edit: statEdit, raw_json: rawJson, additional_writes_json: _additionalWritesJson, ...option } = row;
-  return { ...option, ...(primarySource ? { primaryWrite: JSON.parse(primarySource) } : {}), readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), additionalWrites };
+  const { writes_json: writesJson, read_only: readOnly, game_init: gameInit, stat_edit: statEdit, raw_json: rawJson, ...option } = row;
+  return unifiedOption({ ...option, readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), writes: JSON.parse(writesJson) }) as unknown as StoredOption;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -110,24 +90,23 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   const description = typeof candidate.description === "string" ? candidate.description.trim() : "";
   if (description.length > 10000) throw new Error("Description must be 10,000 characters or fewer.");
   const category = candidate.category;
-  const type = candidate.type;
   const value = typeof candidate.value === "string" ? candidate.value.trim() : "";
   const rawJson = candidate.rawJson ?? false;
-  const requestedAddress = typeof candidate.address === "string" && candidate.address.trim() ? candidate.address.trim() : null;
   const requestedGameInit = candidate.gameInit ?? false;
   const requestedStatEdit = candidate.statEdit ?? false;
-  const requestedAdditionalWrites = candidate.additionalWrites ?? [];
+  const writes = optionWrites(candidate);
 
   if (!comment) throw new Error("Enter an option comment.");
   if (!OPTION_CATEGORIES.includes(category as OptionCategory)) throw new Error("Choose a valid category.");
-  if (!WRITE_TYPES.includes(type as WriteType)) throw new Error("Choose a valid write type.");
-  if (!value) throw new Error("Enter an option value.");
+  if (rawJson && !value) throw new Error("Enter JSON settings.");
   if (typeof rawJson !== "boolean") throw new Error("Raw JSON must be a checkbox value.");
-  if (requestedAddress && !/^0x[0-9a-f]+$/i.test(requestedAddress)) throw new Error("Address must be a hexadecimal value beginning with 0x.");
   if (typeof requestedGameInit !== "boolean") throw new Error("Game init must be a checkbox value.");
   if (typeof requestedStatEdit !== "boolean") throw new Error("Edits stats must be a checkbox value.");
-  if (!Array.isArray(requestedAdditionalWrites) || !requestedAdditionalWrites.every(isRecord)) {
-    throw new Error("Additional writes must be a JSON array of objects.");
+  if (!rawJson && (writes.length < 1 || writes.length > 257)) throw new Error("Use between 1 and 257 writes.");
+  for (const [index, write] of writes.entries()) {
+    if (!WRITE_TYPES.includes(write.type as WriteType)) throw new Error(`Write ${index + 1}: choose a valid type.`);
+    if (!(typeof write.value === "string" && write.value.trim()) && !(typeof write.value === "number" && Number.isFinite(write.value))) throw new Error(`Write ${index + 1}: enter a value.`);
+    if (write.address !== undefined && !(typeof write.address === "string" && /^0x[0-9a-f]+$/i.test(write.address)) && !(typeof write.address === "number" && Number.isSafeInteger(write.address) && write.address >= 0)) throw new Error(`Write ${index + 1}: enter a hexadecimal address.`);
   }
   if (rawJson) {
     let parsed: unknown;
@@ -139,23 +118,16 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
     if (!isRecord(parsed)) throw new Error("Raw JSON must be a JSON object.");
   }
 
-  const address = rawJson ? null : requestedAddress;
   const gameInit = rawJson ? false : requestedGameInit;
   const statEdit = rawJson || gameInit ? false : requestedStatEdit;
-  const additionalWrites = rawJson ? [] : requestedAdditionalWrites;
-  const primaryWrite = rawJson ? undefined : candidate.primaryWrite;
-  if (primaryWrite !== undefined) {
-    if (!isRecord(primaryWrite) || primaryWrite.type !== type || String(primaryWrite.value) !== value || (primaryWrite.address ?? null) !== address) {
-      throw new Error("The first write must match the option's type, value, and address.");
-    }
-  }
-  return { comment, description, category: category as OptionCategory, type: type as WriteType, value, address, gameInit, statEdit, rawJson, additionalWrites, ...(primaryWrite ? { primaryWrite: primaryWrite as Record<string, unknown> } : {}) };
+  return { comment, description, category: category as OptionCategory, ...(rawJson ? { value } : {}), gameInit, statEdit, rawJson, writes };
+
 }
 
 function loadOption(id: number): StoredOption {
   const row = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json FROM options WHERE id = ?"
+      "SELECT id, comment, description, read_only, category, value, game_init, stat_edit, raw_json, writes_json FROM options WHERE id = ?"
     )
     .get(id) as unknown as StoredOptionRow | undefined;
   if (!row) throw new Error("The option could not be found.");
@@ -164,13 +136,13 @@ function loadOption(id: number): StoredOption {
 
 function createOption(request: unknown): StoredOption {
   const option = validateOptionRequest(request);
-  const additionalWritesJson = option.additionalWrites.length > 0 ? JSON.stringify(option.additionalWrites) : null;
+  const writesJson = JSON.stringify(option.writes);
 
   const result = getOptionsDatabase()
     .prepare(
-      "INSERT INTO options (comment, description, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO options (comment, description, category, type, value, game_init, stat_edit, raw_json, writes_json) VALUES (?, ?, ?, 'word', ?, ?, ?, ?, ?)"
     )
-    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson, option.primaryWrite ? JSON.stringify(option.primaryWrite) : null);
+    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson);
   return loadOption(Number(result.lastInsertRowid));
 }
 
@@ -178,12 +150,12 @@ function updateOption(id: unknown, request: unknown): StoredOption {
   if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1) throw new Error("Invalid option id.");
   if (loadOption(id).readOnly) throw new Error("This registered option is read-only.");
   const option = validateOptionRequest(request);
-  const additionalWritesJson = option.additionalWrites.length > 0 ? JSON.stringify(option.additionalWrites) : null;
+  const writesJson = JSON.stringify(option.writes);
   const result = getOptionsDatabase()
     .prepare(
-      "UPDATE options SET comment = ?, description = ?, category = ?, type = ?, value = ?, address = ?, game_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = ?, primary_write_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
+      "UPDATE options SET comment = ?, description = ?, category = ?, type = 'word', value = ?, address = NULL, game_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = NULL, primary_write_json = NULL, writes_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
     )
-    .run(option.comment, option.description, option.category, option.type, option.value, option.address, option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, additionalWritesJson, option.primaryWrite ? JSON.stringify(option.primaryWrite) : null, id);
+    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson, id);
   if (result.changes !== 1) throw new Error("The option could not be found.");
   return loadOption(id);
 }

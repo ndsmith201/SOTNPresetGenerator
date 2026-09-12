@@ -119,10 +119,11 @@ async function main() {
     await button('Create option');
     await waitFor(`!document.querySelector('.option-builder[open]')`);
     const input = await evaluate('window.__calls.at(-1).input');
-    assert.equal(input.address, '0x00123456');
-    assert.equal(input.primaryWrite.comment, 'My addressed write');
-    assert.deepEqual(input.primaryWrite.custom, { retained: true });
-    assert.equal(input.additionalWrites[1].address, undefined);
+    assert.equal(input.writes[0].address, '0x00123456');
+    assert.equal(input.writes[0].comment, 'My addressed write');
+    assert.deepEqual(input.writes[0].custom, { retained: true });
+    assert.equal(input.writes[2].address, undefined);
+    for (const field of ['primaryWrite', 'additionalWrites', 'type', 'value', 'address']) assert.equal(input[field], undefined);
     const presets = await evaluate(`JSON.parse(localStorage.getItem('sotn-preset-generator.presets.v1'))`);
     assert.deepEqual(presets.find(p => p.id === '0').optionIds, ['option:3']);
     assert.deepEqual(presets.find(p => p.id === '1').optionIds, []);
@@ -132,7 +133,7 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field(1, 'address (optional)'))}).value`), '0x00123456');
     await fill(field(1, 'address (optional)'), '');
     await button('Save changes'); await waitFor(`!document.querySelector('.option-builder[open]')`);
-    assert.equal(await evaluate('window.__calls.at(-1).input.primaryWrite.address'), undefined);
+    assert.equal(await evaluate('window.__calls.at(-1).input.writes[0].address'), undefined);
     // Registered options stay protected and remain selectable for copying.
     await click('[aria-label="Actions for ITS OVER 9000 Mode"]'); await button('View');
     assert.equal(await evaluate(`document.querySelectorAll('.option-builder input:not([readonly]), .option-builder textarea:not([readonly])').length`), 0);
