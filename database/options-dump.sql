@@ -19,93 +19,93 @@ CREATE TABLE options (
   ),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-, stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)), description TEXT NOT NULL DEFAULT '', read_only INTEGER NOT NULL DEFAULT 0 CHECK (read_only IN (0, 1)), primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')));
+, stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)), description TEXT NOT NULL DEFAULT '', read_only INTEGER NOT NULL DEFAULT 0 CHECK (read_only IN (0, 1)), primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')), writes_json TEXT CHECK (writes_json IS NULL OR (json_valid(writes_json) AND json_type(writes_json) = 'array')));
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (1, 'Enable Soul of Bat', 'relics', 'word', '0xa0627964', NULL, 0, 0, NULL, '2026-09-04 16:49:24', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (1, 'Enable Soul of Bat', 'relics', 'word', '0xa0627964', NULL, 0, 0, NULL, '2026-09-04 16:49:24', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Soul of Bat","type":"word","value":"0xa0627964"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (2, 'Enable Fire of Bat', 'relics', 'word', '0xa0627965', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (2, 'Enable Fire of Bat', 'relics', 'word', '0xa0627965', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Fire of Bat","type":"word","value":"0xa0627965"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (3, 'Enable Echo of Bat', 'relics', 'word', '0xa0627966', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (3, 'Enable Echo of Bat', 'relics', 'word', '0xa0627966', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Echo of Bat","type":"word","value":"0xa0627966"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (4, 'Enable Force of Echo', 'relics', 'word', '0xa0627967', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (4, 'Enable Force of Echo', 'relics', 'word', '0xa0627967', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Force of Echo","type":"word","value":"0xa0627967"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (5, 'Enable Soul of Wolf', 'relics', 'word', '0xa0627968', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (5, 'Enable Soul of Wolf', 'relics', 'word', '0xa0627968', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Soul of Wolf","type":"word","value":"0xa0627968"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (6, 'Enable Power of Wolf', 'relics', 'word', '0xa0627969', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (6, 'Enable Power of Wolf', 'relics', 'word', '0xa0627969', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Power of Wolf","type":"word","value":"0xa0627969"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (7, 'Enable Skill of Wolf', 'relics', 'word', '0xa062796a', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (7, 'Enable Skill of Wolf', 'relics', 'word', '0xa062796a', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Skill of Wolf","type":"word","value":"0xa062796a"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (8, 'Enable Form of Mist', 'relics', 'word', '0xa062796b', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (8, 'Enable Form of Mist', 'relics', 'word', '0xa062796b', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Form of Mist","type":"word","value":"0xa062796b"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (9, 'Enable Power of Mist', 'relics', 'word', '0xa062796c', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (9, 'Enable Power of Mist', 'relics', 'word', '0xa062796c', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Power of Mist","type":"word","value":"0xa062796c"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (10, 'Enable Gas Cloud', 'relics', 'word', '0xa062796d', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (10, 'Enable Gas Cloud', 'relics', 'word', '0xa062796d', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Gas Cloud","type":"word","value":"0xa062796d"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (11, 'Enable Cube of Zoe', 'relics', 'word', '0xa062796e', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (11, 'Enable Cube of Zoe', 'relics', 'word', '0xa062796e', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Cube of Zoe","type":"word","value":"0xa062796e"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (12, 'Enable Spirit Orb', 'relics', 'word', '0xa062796f', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (12, 'Enable Spirit Orb', 'relics', 'word', '0xa062796f', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Spirit Orb","type":"word","value":"0xa062796f"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (13, 'Enable Gravity Boots', 'relics', 'word', '0xa0627970', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (13, 'Enable Gravity Boots', 'relics', 'word', '0xa0627970', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Gravity Boots","type":"word","value":"0xa0627970"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (14, 'Enable Leap Stone', 'relics', 'word', '0xa0627971', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (14, 'Enable Leap Stone', 'relics', 'word', '0xa0627971', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Leap Stone","type":"word","value":"0xa0627971"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (15, 'Enable Holy Symbol', 'relics', 'word', '0xa0627972', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (15, 'Enable Holy Symbol', 'relics', 'word', '0xa0627972', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Holy Symbol","type":"word","value":"0xa0627972"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (16, 'Enable Faerie Scroll', 'relics', 'word', '0xa0627973', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (16, 'Enable Faerie Scroll', 'relics', 'word', '0xa0627973', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Faerie Scroll","type":"word","value":"0xa0627973"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (17, 'Enable Jewel of Open', 'relics', 'word', '0xa0627974', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (17, 'Enable Jewel of Open', 'relics', 'word', '0xa0627974', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Jewel of Open","type":"word","value":"0xa0627974"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (18, 'Enable Merman Statue', 'relics', 'word', '0xa0627975', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (18, 'Enable Merman Statue', 'relics', 'word', '0xa0627975', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Merman Statue","type":"word","value":"0xa0627975"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (19, 'Enable Bat Card', 'relics', 'word', '0xa0627976', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (19, 'Enable Bat Card', 'relics', 'word', '0xa0627976', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Bat Card","type":"word","value":"0xa0627976"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (20, 'Enable Ghost Card', 'relics', 'word', '0xa0627977', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (20, 'Enable Ghost Card', 'relics', 'word', '0xa0627977', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Ghost Card","type":"word","value":"0xa0627977"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (21, 'Enable Faerie Card', 'relics', 'word', '0xa0627978', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (21, 'Enable Faerie Card', 'relics', 'word', '0xa0627978', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Faerie Card","type":"word","value":"0xa0627978"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (22, 'Enable Demon Card', 'relics', 'word', '0xa0627979', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (22, 'Enable Demon Card', 'relics', 'word', '0xa0627979', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Demon Card","type":"word","value":"0xa0627979"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (23, 'Enable Sword Card', 'relics', 'word', '0xa062797a', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (23, 'Enable Sword Card', 'relics', 'word', '0xa062797a', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Sword Card","type":"word","value":"0xa062797a"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (24, 'Enable Sprite Card', 'relics', 'word', '0xa062797b', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (24, 'Enable Sprite Card', 'relics', 'word', '0xa062797b', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Sprite Card","type":"word","value":"0xa062797b"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (25, 'Enable Nosedevil Card', 'relics', 'word', '0xa062797c', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (25, 'Enable Nosedevil Card', 'relics', 'word', '0xa062797c', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Nosedevil Card","type":"word","value":"0xa062797c"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (26, 'Enable Heart of Vlad', 'relics', 'word', '0xa062797d', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (26, 'Enable Heart of Vlad', 'relics', 'word', '0xa062797d', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Heart of Vlad","type":"word","value":"0xa062797d"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (27, 'Enable Tooth of Vlad', 'relics', 'word', '0xa062797e', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (27, 'Enable Tooth of Vlad', 'relics', 'word', '0xa062797e', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Tooth of Vlad","type":"word","value":"0xa062797e"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (28, 'Enable Rib of Vlad', 'relics', 'word', '0xa062797f', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (28, 'Enable Rib of Vlad', 'relics', 'word', '0xa062797f', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Rib of Vlad","type":"word","value":"0xa062797f"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (29, 'Enable Ring of Vlad', 'relics', 'word', '0xa0627980', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (29, 'Enable Ring of Vlad', 'relics', 'word', '0xa0627980', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Ring of Vlad","type":"word","value":"0xa0627980"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (30, 'Enable Eye of Vlad', 'relics', 'word', '0xa0627981', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (30, 'Enable Eye of Vlad', 'relics', 'word', '0xa0627981', NULL, 0, 0, NULL, '2026-09-04 17:01:32', '2026-09-04 17:01:32', 0, '', 1, NULL, '[{"comment":"Enable Eye of Vlad","type":"word","value":"0xa0627981"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (31, 'Death goes home', 'world', 'word', '0x18000006', '0x4BAEA08', 0, 0, NULL, '2026-09-04 17:43:05', '2026-09-07 05:43:08', 0, 'Death won''t take Alucard''s gear', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (31, 'Death goes home', 'world', 'word', '0x18000006', '0x4BAEA08', 0, 0, NULL, '2026-09-04 17:43:05', '2026-09-07 05:43:08', 0, 'Death won''t take Alucard''s gear', 1, NULL, '[{"comment":"Death goes home","type":"word","value":"0x18000006","address":"0x4BAEA08"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (32, 'One Hit Death', 'challenge', 'word', '0x080288B1', '0x10B17C', 0, 0, '[{"type":"word","value":"0x00000000"},{"type":"word","value":"0x0C04296F","address":"0xAE2AC"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x3C088009"},{"type":"word","value":"0xA5007BA0"},{"type":"word","value":"0x0803CC4F"},{"type":"word","value":"0x00000000"}]', '2026-09-04 18:28:59', '2026-09-04 18:28:59', 0, 'Health set to 0 so taking any damage will cause a game over', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (32, 'One Hit Death', 'challenge', 'word', '0x080288B1', '0x10B17C', 0, 0, '[{"type":"word","value":"0x00000000"},{"type":"word","value":"0x0C04296F","address":"0xAE2AC"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x3C088009"},{"type":"word","value":"0xA5007BA0"},{"type":"word","value":"0x0803CC4F"},{"type":"word","value":"0x00000000"}]', '2026-09-04 18:28:59', '2026-09-04 18:28:59', 0, 'Health set to 0 so taking any damage will cause a game over', 1, NULL, '[{"comment":"One Hit Death","type":"word","value":"0x080288B1","address":"0x10B17C"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x0C04296F","address":"0xAE2AC"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x3C088009"},{"type":"word","value":"0xA5007BA0"},{"type":"word","value":"0x0803CC4F"},{"type":"word","value":"0x00000000"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (33, 'Permanent Poison', 'challenge', 'word', '0x34040000', '0x127604', 0, 0, '[{"type":"word","value":"0x0C03F6C6"},{"type":"word","value":"0x34050FFF"},{"type":"word","value":"0x3C050016"},{"type":"word","value":"0x34A5002C"},{"type":"word","value":"0x3C048007"},{"type":"word","value":"0x8C84C3B8"},{"type":"word","value":"0x00003021"},{"type":"word","value":"0x3C018007"},{"type":"word","value":"0xA4222F00"},{"type":"word","value":"0x34028164"},{"type":"word","value":"0x0C046ABF"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x08042EFE"},{"type":"word","value":"0x00000000"}]', '2026-09-04 18:39:17', '2026-09-04 18:39:17', 0, 'Alucard will have the poisoned status permanently', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (33, 'Permanent Poison', 'challenge', 'word', '0x34040000', '0x127604', 0, 0, '[{"type":"word","value":"0x0C03F6C6"},{"type":"word","value":"0x34050FFF"},{"type":"word","value":"0x3C050016"},{"type":"word","value":"0x34A5002C"},{"type":"word","value":"0x3C048007"},{"type":"word","value":"0x8C84C3B8"},{"type":"word","value":"0x00003021"},{"type":"word","value":"0x3C018007"},{"type":"word","value":"0xA4222F00"},{"type":"word","value":"0x34028164"},{"type":"word","value":"0x0C046ABF"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x08042EFE"},{"type":"word","value":"0x00000000"}]', '2026-09-04 18:39:17', '2026-09-04 18:39:17', 0, 'Alucard will have the poisoned status permanently', 1, NULL, '[{"comment":"Permanent Poison","type":"word","value":"0x34040000","address":"0x127604"},{"type":"word","value":"0x0C03F6C6"},{"type":"word","value":"0x34050FFF"},{"type":"word","value":"0x3C050016"},{"type":"word","value":"0x34A5002C"},{"type":"word","value":"0x3C048007"},{"type":"word","value":"0x8C84C3B8"},{"type":"word","value":"0x00003021"},{"type":"word","value":"0x3C018007"},{"type":"word","value":"0xA4222F00"},{"type":"word","value":"0x34028164"},{"type":"word","value":"0x0C046ABF"},{"type":"word","value":"0x00000000"},{"type":"word","value":"0x08042EFE"},{"type":"word","value":"0x00000000"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (34, 'No (Alucard) Spells', 'challenge', 'char', '0xFF', '0x000b5260', 0, 0, '[{"type":"char","value":"0xFF","address":"0x000b5244"},{"type":"char","value":"0xFF","address":"0x000b527c"},{"type":"char","value":"0xFF","address":"0x000b5298"},{"type":"char","value":"0xFF","address":"0x000b52d0"}]', '2026-09-04 18:59:58', '2026-09-07 05:51:00', 0, 'All spells available to Alucard in human form are disabled', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (34, 'No (Alucard) Spells', 'challenge', 'char', '0xFF', '0x000b5260', 0, 0, '[{"type":"char","value":"0xFF","address":"0x000b5244"},{"type":"char","value":"0xFF","address":"0x000b527c"},{"type":"char","value":"0xFF","address":"0x000b5298"},{"type":"char","value":"0xFF","address":"0x000b52d0"}]', '2026-09-04 18:59:58', '2026-09-07 05:51:00', 0, 'All spells available to Alucard in human form are disabled', 1, NULL, '[{"comment":"No (Alucard) Spells","type":"char","value":"0xFF","address":"0x000b5260"},{"type":"char","value":"0xFF","address":"0x000b5244"},{"type":"char","value":"0xFF","address":"0x000b527c"},{"type":"char","value":"0xFF","address":"0x000b5298"},{"type":"char","value":"0xFF","address":"0x000b52d0"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (35, 'Disable Wingsmash', 'challenge', 'char', '0xFF', '0x000b52ec', 0, 0, NULL, '2026-09-04 19:10:41', '2026-09-07 05:52:02', 0, 'Fully disable bat wingsmash spell', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (35, 'Disable Wingsmash', 'challenge', 'char', '0xFF', '0x000b52ec', 0, 0, NULL, '2026-09-04 19:10:41', '2026-09-07 05:52:02', 0, 'Fully disable bat wingsmash spell', 1, NULL, '[{"comment":"Disable Wingsmash","type":"char","value":"0xFF","address":"0x000b52ec"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (36, 'Infinite Wingsmash', 'gameplay', 'char', '0x00', '0x0134074', 0, 0, NULL, '2026-09-04 19:11:18', '2026-09-04 19:11:18', 0, 'Bat wingsmash spell doesnt need to be re-entered to keep going', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (36, 'Infinite Wingsmash', 'gameplay', 'char', '0x00', '0x0134074', 0, 0, NULL, '2026-09-04 19:11:18', '2026-09-04 19:11:18', 0, 'Bat wingsmash spell doesnt need to be re-entered to keep going', 1, NULL, '[{"comment":"Infinite Wingsmash","type":"char","value":"0x00","address":"0x0134074"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (37, 'Full Screen Force of Echo', 'gameplay', 'char', '0xfe', '0x0014c8bc', 0, 0, '[{"type":"char","address":"0x0014c8c4","value":"0xf0"}]', '2026-09-04 19:13:22', '2026-09-04 19:13:22', 0, 'Force of Echo hits every enemy on screen', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (37, 'Full Screen Force of Echo', 'gameplay', 'char', '0xfe', '0x0014c8bc', 0, 0, '[{"type":"char","address":"0x0014c8c4","value":"0xf0"}]', '2026-09-04 19:13:22', '2026-09-04 19:13:22', 0, 'Force of Echo hits every enemy on screen', 1, NULL, '[{"comment":"Full Screen Force of Echo","type":"char","value":"0xfe","address":"0x0014c8bc"},{"type":"char","address":"0x0014c8c4","value":"0xf0"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (38, 'Lycan Wolf Mana Costs', 'gameplay', 'short', '0x0000', '0x00118cc8', 0, 0, '[{"type":"char","address":"0x000b53b0","value":"0x01"}]', '2026-09-04 19:16:28', '2026-09-07 05:53:09', 0, 'Reduced wolf transform/charge/collision mana cost', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (38, 'Lycan Wolf Mana Costs', 'gameplay', 'short', '0x0000', '0x00118cc8', 0, 0, '[{"type":"char","address":"0x000b53b0","value":"0x01"}]', '2026-09-04 19:16:28', '2026-09-07 05:53:09', 0, 'Reduced wolf transform/charge/collision mana cost', 1, NULL, '[{"comment":"Lycan Wolf Mana Costs","type":"short","value":"0x0000","address":"0x00118cc8"},{"type":"char","address":"0x000b53b0","value":"0x01"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (39, '0 Mana Wingsmash', 'gameplay', 'char', '0x00', '0x000b52ec', 0, 0, NULL, '2026-09-04 19:18:18', '2026-09-04 19:18:18', 0, 'Wingsmash no longer consumes MP', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (39, '0 Mana Wingsmash', 'gameplay', 'char', '0x00', '0x000b52ec', 0, 0, NULL, '2026-09-04 19:18:18', '2026-09-04 19:18:18', 0, 'Wingsmash no longer consumes MP', 1, NULL, '[{"comment":"0 Mana Wingsmash","type":"char","value":"0x00","address":"0x000b52ec"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (40, '0 Mana Gravity Jump', 'gameplay', 'short', '0x0000', '0x118D3C', 0, 0, NULL, '2026-09-04 19:19:09', '2026-09-04 19:19:09', 0, 'Gravity jump no longer consumes MP', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (40, '0 Mana Gravity Jump', 'gameplay', 'short', '0x0000', '0x118D3C', 0, 0, NULL, '2026-09-04 19:19:09', '2026-09-04 19:19:09', 0, 'Gravity jump no longer consumes MP', 1, NULL, '[{"comment":"0 Mana Gravity Jump","type":"short","value":"0x0000","address":"0x118D3C"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (41, 'Unlocked 1st Castle Teleporters', 'world', 'word', '0x3402001F', NULL, 1, 0, '[{"type":"word","value":"0xa062BEBC"}]', '2026-09-04 20:42:15', '2026-09-07 05:44:12', 0, 'Opens all of the 1st castle teleporters', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (41, 'Unlocked 1st Castle Teleporters', 'world', 'word', '0x3402001F', NULL, 1, 0, '[{"type":"word","value":"0xa062BEBC"}]', '2026-09-04 20:42:15', '2026-09-07 05:44:12', 0, 'Opens all of the 1st castle teleporters', 1, NULL, '[{"comment":"Unlocked 1st Castle Teleporters","type":"word","value":"0x3402001F"},{"type":"word","value":"0xa062BEBC"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (42, 'Unlocked 2nd Castle Teleporters', 'world', 'word', '0x3402001F', NULL, 1, 0, '[{"type":"word","value":"0xa062BEBD"}]', '2026-09-04 20:52:31', '2026-09-08 04:13:33', 0, 'Opens 2nd castle teleporters', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (42, 'Unlocked 2nd Castle Teleporters', 'world', 'word', '0x3402001F', NULL, 1, 0, '[{"type":"word","value":"0xa062BEBD"}]', '2026-09-04 20:52:31', '2026-09-08 04:13:33', 0, 'Opens 2nd castle teleporters', 1, NULL, '[{"comment":"Unlocked 2nd Castle Teleporters","type":"word","value":"0x3402001F"},{"type":"word","value":"0xa062BEBD"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (43, 'Naked Mode', 'challenge', 'word', '{"startingEquipment": [{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (43, 'Naked Mode', 'challenge', 'word', '{"startingEquipment": [{
     "slot": "Right hand",
     "item": null
   }, {
@@ -123,50 +123,21 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
   }, {
     "slot": "Other",
     "item": null
-  }]}', NULL, 0, 1, NULL, '2026-09-04 21:41:46', '2026-09-07 05:48:19', 0, 'Alucard starts with no equipment', 1, NULL);
+  }]}', NULL, 0, 1, NULL, '2026-09-04 21:41:46', '2026-09-07 05:48:19', 0, 'Alucard starts with no equipment', 1, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (44, 'ITS OVER 9000 Mode', 'gameplay', 'word', '0x34020063', NULL, 0, 0, '[{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"}]', '2026-09-07 04:43:51', '2026-09-07 05:46:22', 1, 'Sets all of Alucard''s stats to 99', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (44, 'ITS OVER 9000 Mode', 'gameplay', 'word', '0x34020063', NULL, 0, 0, '[{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"}]', '2026-09-07 04:43:51', '2026-09-07 05:46:22', 1, 'Sets all of Alucard''s stats to 99', 1, NULL, '[{"comment":"ITS OVER 9000 Mode","type":"word","value":"0x34020063"},{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (45, 'Humble Beginnings', 'challenge', 'word', '0x34020001', NULL, 0, 0, '[{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"},{"type":"word","value":"0x34020014"},{"type":"word","value":"0xa0627ba0"},{"type":"word","value":"0xa0627ba4"},{"type":"word","value":"0xa0627bb4"}]', '2026-09-07 05:20:18', '2026-09-07 05:47:55', 1, 'All stats start at 1, health/mana start at 20', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (45, 'Humble Beginnings', 'challenge', 'word', '0x34020001', NULL, 0, 0, '[{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"},{"type":"word","value":"0x34020014"},{"type":"word","value":"0xa0627ba0"},{"type":"word","value":"0xa0627ba4"},{"type":"word","value":"0xa0627bb4"}]', '2026-09-07 05:20:18', '2026-09-07 05:47:55', 1, 'All stats start at 1, health/mana start at 20', 1, NULL, '[{"comment":"Humble Beginnings","type":"word","value":"0x34020001"},{"type":"word","value":"0xa0627bc0"},{"type":"word","value":"0xa0627bb8"},{"type":"word","value":"0xa0627bbc"},{"type":"word","value":"0xa0627bc4"},{"type":"word","value":"0x34020014"},{"type":"word","value":"0xa0627ba0"},{"type":"word","value":"0xa0627ba4"},{"type":"word","value":"0xa0627bb4"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (46, 'Warlock Spell Costs', 'gameplay', 'char', '0x01', '0x000b5260', 0, 0, '[{"type":"char","address":"0x000b5244","value":"0x02"},{"type":"char","address":"0x000b527c","value":"0x02"},{"type":"char","address":"0x000b5298","value":"0x03"},{"type":"char","address":"0x000b52d0","value":"0x04"}]', '2026-09-07 06:06:50', '2026-09-07 06:07:04', 0, 'Reduced mana costs for Alucard spells', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (46, 'Warlock Spell Costs', 'gameplay', 'char', '0x01', '0x000b5260', 0, 0, '[{"type":"char","address":"0x000b5244","value":"0x02"},{"type":"char","address":"0x000b527c","value":"0x02"},{"type":"char","address":"0x000b5298","value":"0x03"},{"type":"char","address":"0x000b52d0","value":"0x04"}]', '2026-09-07 06:06:50', '2026-09-07 06:07:04', 0, 'Reduced mana costs for Alucard spells', 1, NULL, '[{"comment":"Warlock Spell Costs","type":"char","value":"0x01","address":"0x000b5260"},{"type":"char","address":"0x000b5244","value":"0x02"},{"type":"char","address":"0x000b527c","value":"0x02"},{"type":"char","address":"0x000b5298","value":"0x03"},{"type":"char","address":"0x000b52d0","value":"0x04"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (47, 'Warlock Mist Costs', 'gameplay', 'short', '0x0000', '0x00118b34', 0, 0, '[{"type":"short","address":"0x00118ae8","value":"0x0000"}]', '2026-09-08 02:34:36', '2026-09-08 02:34:36', 0, 'Mist transform doesnt consume MP', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (47, 'Warlock Mist Costs', 'gameplay', 'short', '0x0000', '0x00118b34', 0, 0, '[{"type":"short","address":"0x00118ae8","value":"0x0000"}]', '2026-09-08 02:34:36', '2026-09-08 02:34:36', 0, 'Mist transform doesnt consume MP', 1, NULL, '[{"comment":"Warlock Mist Costs","type":"short","value":"0x0000","address":"0x00118b34"},{"type":"short","address":"0x00118ae8","value":"0x0000"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (48, 'Open Non-Complexity Altering Shortcuts', 'world', 'word', '0x34020001', NULL, 1, 0, '[{"type":"word","value":"0xa062BE6F"},{"type":"word","value":"0xa062BE80"},{"type":"word","value":"0xa062BE9D"},{"type":"word","value":"0xa062BDFC"},{"type":"word","value":"0xa062BE1D"}]', '2026-09-08 03:00:53', '2026-09-08 03:07:31', 0, 'Opens Alchemy Lab Cannon, Attic Stairs, Colosseum to Royal Chapel, Outer Wall Elevator, Forbidden Route', 1, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (48, 'Open Non-Complexity Altering Shortcuts', 'world', 'word', '0x34020001', NULL, 1, 0, '[{"type":"word","value":"0xa062BE6F"},{"type":"word","value":"0xa062BE80"},{"type":"word","value":"0xa062BE9D"},{"type":"word","value":"0xa062BDFC"},{"type":"word","value":"0xa062BE1D"}]', '2026-09-08 03:00:53', '2026-09-08 03:07:31', 0, 'Opens Alchemy Lab Cannon, Attic Stairs, Colosseum to Royal Chapel, Outer Wall Elevator, Forbidden Route', 1, NULL, '[{"comment":"Open Non-Complexity Altering Shortcuts","type":"word","value":"0x34020001"},{"type":"word","value":"0xa062BE6F"},{"type":"word","value":"0xa062BE80"},{"type":"word","value":"0xa062BE9D"},{"type":"word","value":"0xa062BDFC"},{"type":"word","value":"0xa062BE1D"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (50, 'Lycan Equipment', 'items', 'word', '{ "startingEquipment": [
-    {
-      "slot": "Right hand",
-      "item": "Shield rod"
-    },
-    {
-      "slot": "Left hand",
-      "item": "Shaman shield"
-    },
-    {
-      "slot": "Head",
-      "item": "Silver crown"
-    },
-    {
-      "slot": "Body",
-      "item": "Brilliant mail"
-    },
-    {
-      "slot": "Cloak",
-      "item": "Blood cloak"
-    },
-    {
-      "slot": "Other",
-      "item": "Mystic pendant"
-    }
-  ]}', NULL, 0, 1, NULL, '2026-09-10 04:00:21', '2026-09-10 04:00:59', 0, '', 0, NULL);
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (52, 'MP Gain', 'challenge', 'char', '01', '0x00117856', 0, 0, '[{"type":"char","value":"01","address":"0x00117858"}]', '2026-09-11 16:37:31', '2026-09-12 05:57:26', 0, 'Reduces how much MP you gain on level up', 0, '{"type":"char","value":"01","comment":"Slow MP Gain","address":"0x00117856"}', '[{"type":"char","value":"01","comment":"Slow MP Gain","address":"0x00117856"},{"type":"char","value":"01","address":"0x00117858"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (51, 'Slow HP Gain', 'challenge', 'char', '0x01', '0x000aefdc', 0, 0, '[{"type":"char","address":"0x000aefe0","value":"0x02"},{"type":"char","address":"0x000aefe4","value":"0x04"},{"type":"char","address":"0x000aefe8","value":"0x08"},{"type":"char","address":"0x000aefec","value":"0x0c"},{"type":"char","address":"0x000aeff0","value":"0x10"},{"type":"char","address":"0x000aeff4","value":"0x20"},{"type":"char","address":"0x000aeff8","value":"0x30"},{"type":"char","address":"0x000aeffc","value":"0x40"}]', '2026-09-11 05:18:44', '2026-09-11 16:23:39', 0, 'Reduces how much hp you gain on level up', 0, NULL);
-
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (52, 'Slow MP Gain', 'challenge', 'char', '01', '0x00117856', 0, 0, '[{"type":"char","value":"01","address":"0x00117858"}]', '2026-09-11 16:37:31', '2026-09-11 16:37:47', 0, '', 0, NULL);
-
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (53, 'No Good Weapons', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (53, 'No Good Weapons', 'challenge', 'word', '{
   "blockItems": [{
     "zone": "*",
     "item": "*",
@@ -203,9 +174,9 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
       "Sword of Dawn"
     ]
   }]
-}', NULL, 0, 1, NULL, '2026-09-11 16:47:47', '2026-09-11 16:59:26', 0, 'One mans trash is another mans...well trash', 0, NULL);
+}', NULL, 0, 1, NULL, '2026-09-11 16:47:47', '2026-09-11 16:59:26', 0, 'One mans trash is another mans...well trash', 0, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (54, 'No Good Starting Weapons', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (54, 'No Good Starting Weapons', 'challenge', 'word', '{
   "blockEquipment": [
     {
       "slot": "Right hand",
@@ -286,9 +257,9 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
       ]
     }
   ]
-}', NULL, 0, 1, NULL, '2026-09-11 17:00:46', '2026-09-11 17:33:12', 0, '', 0, NULL);
+}', NULL, 0, 1, NULL, '2026-09-11 17:00:46', '2026-09-11 17:33:12', 0, '', 0, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (55, 'Nimble Equipment', 'items', 'word', '{"startingEquipment": [{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (55, 'Nimble Equipment', 'items', 'word', '{"startingEquipment": [{
     "slot": "Right hand",
     "item": "Manna prism"
   }, {
@@ -306,9 +277,9 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
   }, {
     "slot": "Other",
     "item": "Duplicator"
-  }]}', NULL, 0, 1, NULL, '2026-09-11 17:54:59', '2026-09-11 17:54:59', 0, '', 0, NULL);
+  }]}', NULL, 0, 1, NULL, '2026-09-11 17:54:59', '2026-09-12 05:52:14', 0, 'Starts Alucard with Manna Prism, Buffalo Star, Dragon Helm, Alucard Mail, Twilight Cloak, and Duplicator', 0, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json") VALUES (56, 'No Good Weapons', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (56, 'No Good Weapons', 'challenge', 'word', '{
   "blockEquipment": [{
     "slot": "Right hand",
     "item": [
@@ -418,10 +389,105 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
       "Sword of Dawn"
     ]
   }]
-}', NULL, 0, 1, NULL, '2026-09-12 04:03:07', '2026-09-12 04:03:07', 0, 'One mans trash is another mans...well trash', 0, NULL);
+}', NULL, 0, 1, NULL, '2026-09-12 04:03:07', '2026-09-12 04:03:07', 0, 'One mans trash is another mans...well trash', 0, NULL, '[]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (58, 'Slow MP Gain', 'challenge', 'char', '01', '0x00117856', 0, 0, '[{"type":"char","value":"01","address":"0x00117858"}]', '2026-09-12 06:01:06', '2026-09-12 06:01:06', 0, 'Reduces the amount of MP on level up', 0, '{"type":"char","value":"01","address":"0x00117856","comment":"Slow MP Gain"}', '[{"type":"char","value":"01","address":"0x00117856","comment":"Slow MP Gain"},{"type":"char","value":"01","address":"0x00117858"}]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (59, 'Disable Level ups', 'challenge', 'word', '0', NULL, 0, 0, NULL, '2026-09-12 06:31:46', '2026-09-12 06:31:46', 0, 'Dont allow alucard to level up', 0, NULL, '[{"address":"0xB9F30","comment":"Disable Level ups","type":"word","value":"0xF423F"},{"type":"word","value":"0xF423F","address":"0x436812C"}]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (62, 'Slow HP Gain', 'challenge', 'word', '0', NULL, 0, 0, NULL, '2026-09-12 06:32:07', '2026-09-12 06:32:07', 0, 'Reduces how much hp you gain on level up', 0, NULL, '[{"address":"0x000aefdc","comment":"Slow HP Gain","type":"char","value":"0x01"},{"type":"char","address":"0x000aefe0","value":"0x02"},{"type":"char","address":"0x000aefe4","value":"0x04"},{"type":"char","address":"0x000aefe8","value":"0x08"},{"type":"char","address":"0x000aefec","value":"0x0c"},{"type":"char","address":"0x000aeff0","value":"0x10"},{"type":"char","address":"0x000aeff4","value":"0x20"},{"type":"char","address":"0x000aeff8","value":"0x30"},{"type":"char","address":"0x000aeffc","value":"0x40"}]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (63, 'Lycan Equipment', 'items', 'word', '{ "startingEquipment": [
+    {
+      "slot": "Right hand",
+      "item": "Shield rod"
+    },
+    {
+      "slot": "Left hand",
+      "item": "Shaman shield"
+    },
+    {
+      "slot": "Head",
+      "item": "Silver crown"
+    },
+    {
+      "slot": "Body",
+      "item": "Brilliant mail"
+    },
+    {
+      "slot": "Cloak",
+      "item": "Blood cloak"
+    },
+    {
+      "slot": "Other",
+      "item": "Mystic pendant"
+    }
+  ]}', NULL, 0, 1, NULL, '2026-09-12 06:32:13', '2026-09-12 06:32:13', 0, 'Starts Alucard with Shield Rod, Shaman Shield, Silver Crown, Brilliant Mail, Blood Cloak, and Mystic Pendant', 0, NULL, '[]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (64, 'No Good Weapon Drops', 'challenge', 'word', '{
+  "blockDrops": [
+    {
+      "enemy": "*",
+      "items": [
+        "Crissaegrim",
+        "Library card",
+        "Vorpal blade",
+        "Gurthang",
+        "Masamune",
+        "Osafune katana",
+        "Mablung Sword",
+        "Duplicator",
+        "Estoc",
+        "Yasutsuna",
+        "Mourneblade",
+        "Alucard shield",
+        "Jewel sword",
+        "Short sword",
+        "Tyrfing",
+        "Red Rust",
+        "God''s Garb",
+        "Mojo mail",
+        "Fury plate",
+        "Alucard mail",
+        "Muramasa",
+        "Fist of Tulkas",
+        "Ring of Varda",
+        "Ring of Ares",
+        "Resist stone",
+        "Resist holy",
+        "Resist thunder",
+        "Resist fire",
+        "Resist ice",
+        "Resist dark",
+        "Cloth tunic",
+        "Hide cuirass",
+        "Bronze cuirass",
+        "Toadstool",
+        "Blue knuckles",
+        "Gladius",
+        "Basilard",
+        "Leather shield",
+        "Knight shield",
+        "Rapier",
+        "Badelaire",
+        "Knuckle duster",
+        "Mace",
+        "Morningstar",
+        "Scimitar",
+        "Cutlass",
+        "Namakura",
+        "Takemitsu",
+        "Alucart mail",
+        "Sword of Dawn"
+      ]
+    }
+  ]
+}', NULL, 0, 1, NULL, '2026-09-12 06:32:19', '2026-09-12 06:32:19', 0, '', 0, NULL, '[]');
+
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (65, 'ABRSR', 'world', 'word', '{"newGoalsSet": "x"}', NULL, 0, 1, NULL, '2026-09-12 06:32:25', '2026-09-12 06:32:25', 0, '', 0, NULL, '[]');
 
 DELETE FROM sqlite_sequence WHERE name = 'options';
 
-INSERT INTO sqlite_sequence (name, seq) VALUES ('options', 56);
+INSERT INTO sqlite_sequence (name, seq) VALUES ('options', 65);
 
 COMMIT;
