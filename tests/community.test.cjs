@@ -8,7 +8,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { CommunityClient, DEFAULT_COMMUNITY_CONFIG, validateConfig, requestJson } = require('../dist/community-client');
 const { CommunityAuth } = require('../dist/community-auth');
-const { CommunityService, optionSubmission } = require('../dist/community-service');
+const { CommunityService } = require('../dist/community-service');
+const { optionSubmission } = require('../dist/community-options');
 const { BuiltPresetStore } = require('../dist/preset-generation');
 
 const id = '0123456789abcdef0123456789abcdef';
@@ -265,6 +266,32 @@ test('sharing strips local option fields and accepts an updated preset with its 
   const stale = await service.request({ action: 'sharePreset', buildToken: token });
   assert.equal(stale.status, 'error'); assert.match(stale.error, /Export and build/);
   assert.equal(submitted.length, 2);
+});
+
+test('sharing an authored memory option sends only API fields and preserves its local first write', async t => {
+  const database = new DatabaseSync(':memory:'); t.after(() => database.close());
+  const primaryWrite = { type: 'word', value: 0, address: '0x1234', comment: 'First write note', custom: { keep: true } };
+  const local = { ...data, id: 42, readOnly: false, comment: 'My memory patch', type: 'word', value: '0', address: '0x1234', rawJson: false, gameInit: true,
+    primaryWrite, additionalWrites: [{ type: 'short', value: '1', comment: 'Next write' }] };
+  const original = structuredClone(local);
+  const { id: _id, readOnly: _readOnly, primaryWrite: _primaryWrite, ...expected } = local;
+  const supported = new Set(['comment', 'description', 'category', 'type', 'value', 'address', 'gameInit', 'statEdit', 'rawJson', 'additionalWrites']);
+  const store = storage(); store.write('config', JSON.stringify({ ...DEFAULT_COMMUNITY_CONFIG, apiUrl: 'http://localhost:8080', devUser: 'alice' }));
+  let posted;
+  const service = new CommunityService({ database, storage: store, builds: new BuiltPresetStore(), createOption() { throw new Error('Unexpected import'); }, loadOption: () => local,
+    fetcher: async (_url, init) => {
+      posted = JSON.parse(init.body);
+      const unknown = Object.keys(posted).find(key => !supported.has(key));
+      if (unknown) return response({ message: `invalid option: json: unknown field "${unknown}"` }, 400);
+      return response(item('options', { data: posted }), 201);
+    } });
+  const result = await service.request({ action: 'shareOption', localId: 42 });
+  assert.equal(result.status, 'ok', result.error);
+  assert.deepEqual(posted, expected);
+  assert.deepEqual(result.data.data, expected);
+  assert.deepEqual(local, original);
+  const { packagerConfig } = require('../forge.config.cjs');
+  assert.equal(packagerConfig.ignore('/dist/community-options.js'), false);
 });
 
 test('preset and option author rejection asks for a new name without retrying', async () => {

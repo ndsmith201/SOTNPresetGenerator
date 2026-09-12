@@ -4,6 +4,7 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { CommunityAuth, type CommunityStorage } from "./community-auth";
 import { CommunityClient, CommunityHttpError, isRecord } from "./community-client";
+import { optionSubmission } from "./community-options";
 import type { CommunityRequest, CommunityResult } from "./community-types";
 import type { BuiltPresetStore } from "./preset-generation";
 
@@ -15,9 +16,6 @@ interface Dependencies {
   createOption: (data: unknown) => LocalOption;
   loadOption: (id: number) => LocalOption;
   fetcher?: typeof fetch;
-}
-export function optionSubmission(option: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(["comment", "description", "category", "type", "value", "address", "gameInit", "statEdit", "rawJson", "additionalWrites", "primaryWrite"].filter(key => option[key] !== undefined).map(key => [key, option[key]]));
 }
 
 export class CommunityService {

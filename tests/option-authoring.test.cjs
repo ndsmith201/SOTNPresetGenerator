@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { optionDraft, draftInput, normalizeWrites, parseWriteSource } = require('../dist/renderer/option-authoring');
 const { toPresetOptions } = require('../dist/renderer/preset-utils');
 const { initializeOptionsCatalog } = require('../dist/options-database');
-const { optionSubmission } = require('../dist/community-service');
+const { optionSubmission } = require('../dist/community-options');
 
 const base = { id: 1, readOnly: true, comment: 'Source', description: 'Original', category: 'gameplay', type: 'word', value: '0x34020063', address: null, gameInit: false, statEdit: true, rawJson: false, additionalWrites: [{ type: 'short', value: 0, address: '0x1234', comment: 'Independent note', custom: { keep: true } }] };
 const stored = input => ({ id: 2, readOnly: false, address: null, gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...input });
@@ -25,7 +25,13 @@ test('copy, reorder, save and reopen preserve per-write addresses, notes and ext
   assert.deepEqual(optionDraft(stored(input)).writes, draft.writes);
   assert.deepEqual(toPresetOptions([stored(input)])[0].injectedWrites, draft.writes);
   assert.deepEqual(base, original);
-  assert.deepEqual(optionSubmission(stored(input)).primaryWrite, input.primaryWrite);
+  const published = optionSubmission(stored(input));
+  assert.equal(Object.hasOwn(published, 'primaryWrite'), false);
+  assert.equal(published.type, input.primaryWrite.type);
+  assert.equal(published.value, String(input.primaryWrite.value));
+  assert.equal(published.address, input.primaryWrite.address);
+  assert.deepEqual(published.additionalWrites, input.additionalWrites);
+  assert.deepEqual(optionDraft(stored(input)).writes, draft.writes);
 });
 
 test('every bundled option survives opening and saving without changing its generated writes or settings', () => {

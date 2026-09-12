@@ -1,4 +1,5 @@
 import type { UpdateState } from "../update-types";
+import { optionSubmission } from "../community-options";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -435,7 +436,7 @@ export function App() {
       {optionToDelete && <DeleteOptionDialog option={optionToDelete} onClose={() => setOptionToDelete(null)} onDelete={deleteOption} />}
       <Toast message={toast} />
       {updateOpen && updateState && <UpdateDialog state={updateState} onLater={() => setUpdateDismissed(true)} onRestart={restartForUpdate} />}
-      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : Object.fromEntries(Object.entries(shareTarget.source).filter(([key]) => key !== "id" && key !== "readOnly"))} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
+      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : optionSubmission(shareTarget.source)} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
       {loginOpen && <LoginDialog onClose={() => { setLoginOpen(false); setVotes({}); afterLogin.current = null; }} onSignedIn={() => { setLoginOpen(false); setVotes({}); const next = afterLogin.current; afterLogin.current = null; next?.(); }} />}
     </>
   );
