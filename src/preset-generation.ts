@@ -107,7 +107,14 @@ export class BuiltPresetStore {
   }
 }
 
-export async function generatePatch(build: BuiltPreset, executablePath: string, outputPath: string): Promise<void> {
+export function normalizeSeedName(seedName: unknown): string | undefined {
+  if (seedName === undefined) return undefined;
+  if (typeof seedName !== "string" || seedName.includes("\0")) throw new Error("Enter a valid seed name.");
+  return seedName.trim() || undefined;
+}
+
+export async function generatePatch(build: BuiltPreset, executablePath: string, outputPath: string, seedName?: string): Promise<void> {
+  const seed = normalizeSeedName(seedName);
   if (path.extname(outputPath).toLowerCase() !== ".ppf") throw new Error("Choose a .ppf output file.");
   const temporary = await mkdtemp(path.join(path.dirname(outputPath), ".sotn-generate-"));
   try {
@@ -118,7 +125,9 @@ export async function generatePatch(build: BuiltPreset, executablePath: string, 
     // yargs otherwise mistakes a packaged Electron Node subprocess for a GUI
     // app and treats the script filename as a positional seed URL.
     const bootstrap = "process.defaultApp = true; require(process.argv[1]);";
-    await execFileAsync(executablePath, ["-e", bootstrap, path.join(build.rootPath, "randomize"), "--preset-file", presetFile, "--out", patchFile], {
+    const args = ["-e", bootstrap, path.join(build.rootPath, "randomize"), "--preset-file", presetFile, "--out", patchFile];
+    if (seed !== undefined) args.push(`--seed=${seed}`);
+    await execFileAsync(executablePath, args, {
       cwd: build.rootPath,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       windowsHide: true,

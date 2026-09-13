@@ -19,7 +19,7 @@ export interface PresetAppApi {
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
   exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
   getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;
-  generatePreset: (buildToken: string) => Promise<unknown>;
+  generatePreset: (buildToken: string, seedName?: string) => Promise<unknown>;
   windowControls: {
     minimize: () => void;
     toggleMaximize: () => void;
@@ -52,7 +52,7 @@ const api: PresetAppApi = {
   chooseSotnRandoPath: (currentPath) => ipcRenderer.invoke("sotnrando:choose-path", currentPath) as Promise<unknown>,
   exportPreset: (request) => ipcRenderer.invoke("preset:export", request) as Promise<unknown>,
   getSuccessfulExports: () => ipcRenderer.invoke("preset:successful-exports") as Promise<Record<string, SuccessfulExport>>,
-  generatePreset: (buildToken) => ipcRenderer.invoke("preset:generate", buildToken) as Promise<unknown>,
+  generatePreset: (buildToken, seedName) => ipcRenderer.invoke("preset:generate", buildToken, seedName) as Promise<unknown>,
   windowControls: {
     minimize: () => ipcRenderer.send("window:minimize"),
     toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),

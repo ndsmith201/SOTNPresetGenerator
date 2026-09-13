@@ -6,7 +6,7 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const { BuiltPresetStore, generatePatch } = require('../dist/preset-generation');
+const { BuiltPresetStore, generatePatch, normalizeSeedName } = require('../dist/preset-generation');
 const { exportMatchesCurrent } = require('../dist/renderer/export-state');
 const { TopBar } = require('../dist/renderer/components/TopBar');
 
@@ -152,7 +152,8 @@ for (const modifiedFile of ['presets/test.json', 'build/presets/test.js']) {
   });
 }
 
-test('generation passes the exported preset to the CLI and writes the chosen patch', async (t) => {
+for (const seedName of [undefined, '', '   ', '  Weekend challenge  ', '--out=another.ppf', '"Night" & castle 雪', '0']) {
+test(`generation passes the exported preset and optional seed ${JSON.stringify(seedName)} to the CLI`, async (t) => {
   const root = await fixture(t);
   await writeFile(path.join(root, 'randomize'), `
     const fs = require('node:fs');
@@ -162,15 +163,23 @@ test('generation passes the exported preset to the CLI and writes the chosen pat
     assert.equal(process.argv[2], '--preset-file');
     assert.equal(JSON.parse(fs.readFileSync(process.argv[3])).metadata.id, 'test');
     assert.equal(process.argv[4], '--out');
+    assert.deepEqual(process.argv.slice(6), ${JSON.stringify(seedName?.trim() ? [`--seed=${seedName.trim()}`] : [])});
     fs.writeFileSync(process.argv[5], 'PPF30-test-patch');
   `);
   const store = new BuiltPresetStore();
   const build = await store.resolve(await store.remember(root, 'test'));
   const output = path.join(root, 'chosen output.ppf');
-  await generatePatch(build, process.execPath, output);
+  await generatePatch(build, process.execPath, output, seedName);
   assert.equal(await readFile(output, 'utf8'), 'PPF30-test-patch');
   assert.equal((await readdir(root)).some(name => name.startsWith('.sotn-generate-')), false);
   await assert.rejects(generatePatch(build, process.execPath, path.join(root, 'wrong.bin')), /\.ppf output/);
+});
+}
+
+test('invalid seed names are rejected at the generation boundary', () => {
+  for (const value of [null, 123, {}, ['seed'], 'seed\0name']) {
+    assert.throws(() => normalizeSeedName(value), /valid seed name/);
+  }
 });
 
 test('a failing randomizer preserves an existing output and removes its partial patch', async (t) => {
