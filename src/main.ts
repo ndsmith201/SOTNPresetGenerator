@@ -10,7 +10,7 @@ import squirrelStartup from "electron-squirrel-startup";
 import { deleteUserOption, initializeOptionsCatalog } from "./options-database";
 import { listInstalledPresets, writeNewPreset } from "./installed-presets";
 import { initializeBundledRandomizer, randomizerInstallPath } from "./bundled-randomizer";
-import { BuiltPresetStore, generatePatch } from "./preset-generation";
+import { BuiltPresetStore, generatePatch, normalizeSeedName } from "./preset-generation";
 import { CommunityService } from "./community-service";
 import { optionWrites, unifiedOption } from "./option-writes";
 import { AppUpdater } from "./app-updater";
@@ -435,10 +435,11 @@ function registerWindowControls(): void {
 
   ipcMain.handle("preset:successful-exports", () => builtPresets.listSuccessfulExports());
 
-  ipcMain.handle("preset:generate", async (event, buildToken: unknown) => {
+  ipcMain.handle("preset:generate", async (event, buildToken: unknown, seedName: unknown) => {
     if (generatingPreset) return { status: "error", error: "A patch is already being generated." };
     generatingPreset = true;
     try {
+      const seed = normalizeSeedName(seedName);
       const build = await builtPresets.resolve(buildToken);
       const owner = BrowserWindow.fromWebContents(event.sender);
       const options = {
@@ -449,7 +450,7 @@ function registerWindowControls(): void {
       const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
       if (result.canceled || !result.filePath) return { status: "canceled" };
       await builtPresets.resolve(buildToken);
-      await generatePatch(build, process.execPath, result.filePath);
+      await generatePatch(build, process.execPath, result.filePath, seed);
       shell.showItemInFolder(result.filePath);
       return { status: "generated", path: result.filePath };
     } catch (error) {

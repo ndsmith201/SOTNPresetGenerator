@@ -12,6 +12,7 @@ import { AuthorSettingsDialog } from "./components/AuthorSettingsDialog";
 import { DeleteOptionDialog } from "./components/DeleteOptionDialog";
 import { DeletePresetDialog } from "./components/DeletePresetDialog";
 import { CreatePresetDialog } from "./components/CreatePresetDialog";
+import { GeneratePresetDialog } from "./components/GeneratePresetDialog";
 import { PresetEditor } from "./components/PresetEditor";
 import { PresetLibrary } from "./components/PresetLibrary";
 import { InstalledPresetDialog } from "./components/InstalledPresetDialog";
@@ -65,6 +66,7 @@ export function App() {
   const effectiveAuthor = signedInUsername ?? author;
   const [exporting, setExporting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [successfulExports, setSuccessfulExports] = useState<Record<string, SuccessfulExport>>({});
   const operationPending = useRef(false);
   const [toast, setToast] = useState("");
@@ -301,12 +303,13 @@ export function App() {
     finally { operationPending.current = false; setExporting(false); }
   };
 
-  const generatePreset = async () => {
+  const generatePreset = async (seedName: string) => {
     if (!canGenerate || !currentExport || operationPending.current) return;
+    setGenerateDialogOpen(false);
     operationPending.current = true;
     setGenerating(true);
     try {
-      const result = await window.presetApp.generatePreset(currentExport.buildToken);
+      const result = await window.presetApp.generatePreset(currentExport.buildToken, seedName || undefined);
       if (!isJsonObject(result)) throw new Error("Patch generation failed");
       if (result.status === "generated" && typeof result.path === "string") {
         showToast(`Generated ${result.path.split(/[\\/]/).pop() ?? "PPF patch"}`);
@@ -422,7 +425,7 @@ export function App() {
     <>
       <div className="app-shell">
         <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onChooseExportPath={() => void chooseExportPath()} />
-        <TopBar communityActions={communityActions} onShare={() => requestShare("preset")} editing={Boolean(activePreset || communityItem)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={showLibrary} onExport={() => { void exportPreset().catch(() => {}); }} onGenerate={() => void generatePreset()} onSave={() => showToast("Preset saved locally")} />
+        <TopBar communityActions={communityActions} onShare={() => requestShare("preset")} editing={Boolean(activePreset || communityItem)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={showLibrary} onExport={() => { void exportPreset().catch(() => {}); }} onGenerate={() => setGenerateDialogOpen(true)} onSave={() => showToast("Preset saved locally")} />
         {communityItem ? <div className="community-preset-view">
           {communityError && <p className="community-error" role="alert">{communityError}</p>}
           {communityPreset ? <PresetEditor key={communityItem.id} readOnly preset={communityPreset} maximumComplexity={Math.max(communityPreset.complexity, calculatePresetMaxComplexity(template, communityPreset, options))} options={options.filter(option => communityPreset.optionIds.includes(option.id))} preview={communityItem.data} onChange={() => {}} onNewOption={() => {}} onEditOption={() => {}} onShareOption={() => {}} onDeleteOption={() => {}} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied community JSON"), () => showToast("Unable to copy JSON")); }} /> : communityOption ? <CreateOptionDialog key={communityItem.id} inline open option={communityOption} options={[]} onClose={showLibrary} /> : <main className="workspace"><section className="options-pane"><span className="step-label">Community option</span><h2>{communityItemName(communityItem)}</h2><p>This definition cannot be displayed in the option editor. Its original JSON is available for inspection.</p></section><JsonPreview community preview={communityItem.data} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied option JSON"), () => showToast("Unable to copy JSON")); }} /></main>}
@@ -430,6 +433,7 @@ export function App() {
         </div> : activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onShareOption={requestShare} onDeleteOption={setOptionToDelete} onCopy={() => void copyPreview()} /> : <PresetLibrary onViewCommunity={viewCommunity} presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
+      {generateDialogOpen && <GeneratePresetDialog onClose={() => setGenerateDialogOpen(false)} onSubmit={seedName => void generatePreset(seedName)} />}
       <InstalledPresetDialog preset={viewingInstalled} onClose={() => setViewingInstalled(null)} onCreate={(preset) => { setViewingInstalled(null); setInitialTemplate(preset.fileName); setCreatePresetOpen(true); }} onCopy={(preset) => { void navigator.clipboard.writeText(JSON.stringify(preset.json, null, 2)).then(() => showToast("Copied installed JSON"), () => showToast("Unable to copy JSON")); }} />
       {!communityOption && <CreateOptionDialog open={createOptionOpen} option={editingOption} options={options.map(item => item.source)} onClose={closeOptionDialog} onSubmit={saveOption} />}
       <AuthorSettingsDialog open={authorSettingsOpen} author={author} onClose={() => setAuthorSettingsOpen(false)} onSave={saveAuthor} />
