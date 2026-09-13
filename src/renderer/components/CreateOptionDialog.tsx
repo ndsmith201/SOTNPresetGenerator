@@ -188,5 +188,5 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
 
   return inline ? <section className="option-dialog option-builder option-builder-inline" aria-labelledby="optionDialogTitle">{form}</section> :
     <dialog className="preset-dialog option-dialog option-builder" ref={dialogRef} aria-labelledby="optionDialogTitle"
-      onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>{form}</dialog>;
+      onCancel={event => { event.preventDefault(); close(); }}>{form}</dialog>;
 }
