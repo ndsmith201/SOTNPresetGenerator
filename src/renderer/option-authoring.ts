@@ -31,6 +31,17 @@ export function parseWriteSource(source: string): WriteEntry[] {
   return parsed;
 }
 
+export function parseWriteImport(source: string): WriteEntry[] {
+  // Rich-text copies can include nonbreaking indentation; preserve it inside strings.
+  const json = source.replace(/("(?:\\.|[^"\\])*")|[\u00a0\u202f]/g, (match, quoted: string | undefined) => quoted ?? " ").trim();
+  try {
+    return normalizeWrites(parseWriteSource(json.startsWith("[") ? json : `[${json}]`));
+  } catch (issue) {
+    if (issue instanceof SyntaxError) throw new Error("Enter valid JSON: an array of writes or comma-separated write objects.");
+    throw issue;
+  }
+}
+
 export function normalizeWrites(writes: WriteEntry[]): WriteEntry[] {
   if (!writes.length) throw new Error("Add at least one write.");
   return writes.map((source, index) => {

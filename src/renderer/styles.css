@@ -1898,6 +1898,12 @@ kbd {
 .builder-section-heading { display: flex; align-items: center; gap: 10px; padding-top: 18px; margin-top: 8px; border-top: 1px solid var(--border); }
 .builder-section-heading h3 { margin: 0; }
 .builder-help { margin: 8px 0 14px; }
+.builder-writes-toolbar { display: flex; align-items: center; gap: 16px; margin: 8px 0 14px; }
+.builder-writes-toolbar .builder-help { margin: 0; }
+.builder-writes-toolbar .button { margin-left: auto; flex-shrink: 0; min-height: 30px; padding: 5px 10px; font-size: 11px; }
+.import-writes-dialog { width: min(640px, calc(100vw - 48px)); }
+.import-writes-dialog .preset-dialog-card { max-height: calc(100dvh - 48px); overflow-y: auto; }
+.import-writes-dialog textarea { width: 100%; min-height: 180px; }
 .builder-write-list { display: grid; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .builder-write-row { display: grid; grid-template-columns: 38px 78px minmax(135px, 1fr) minmax(135px, 1fr) minmax(100px, 1fr) 24px; gap: 10px; align-items: end; padding: 6px 10px; background: var(--surface); }
 .builder-write-row + .builder-write-row { border-top: 1px solid var(--border); }
