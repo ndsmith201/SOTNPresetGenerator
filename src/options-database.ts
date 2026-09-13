@@ -101,6 +101,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
   const descriptionExpression = columns.has("description") ? "description" : "''";
   const readOnlyExpression = columns.has("read_only") ? "read_only" : "1";
   const gameInitExpression = columns.has("game_init") ? "game_init" : "0";
+  const itemInitExpression = columns.has("item_init") ? "item_init" : "0";
   const statEditExpression = columns.has("stat_edit") ? "stat_edit" : "0";
   const rawJsonExpression = columns.has("raw_json") ? "raw_json" : "0";
   const additionalWritesExpression = columns.has("additional_writes_json") ? "additional_writes_json" : "NULL";
@@ -121,6 +122,7 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       value TEXT NOT NULL CHECK (length(trim(value)) > 0),
       address TEXT CHECK (address IS NULL OR length(trim(address)) > 0),
       game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
+      item_init INTEGER NOT NULL DEFAULT 0 CHECK (item_init IN (0, 1)),
       stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
       raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
       primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),
@@ -132,8 +134,8 @@ function migrateOptionsCategories(database: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, stat_edit, raw_json, additional_writes_json, primary_write_json, writes_json, created_at, updated_at)
-    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, ${primaryWriteExpression}, ${writesExpression}, created_at, updated_at
+    INSERT INTO options (id, comment, description, read_only, category, type, value, address, game_init, item_init, stat_edit, raw_json, additional_writes_json, primary_write_json, writes_json, created_at, updated_at)
+    SELECT id, comment, ${descriptionExpression}, ${readOnlyExpression}, category, type, value, ${addressExpression}, ${gameInitExpression}, ${itemInitExpression}, ${statEditExpression}, ${rawJsonExpression}, ${additionalWritesExpression}, ${primaryWriteExpression}, ${writesExpression}, created_at, updated_at
     FROM options_before_relic_category;
     DROP TABLE options_before_relic_category;
     COMMIT;
@@ -160,6 +162,9 @@ function migrateOptionalWriteFields(database: DatabaseSync): void {
   }
   if (!columns.has("game_init")) {
     database.exec("ALTER TABLE options ADD COLUMN game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1))");
+  }
+  if (!columns.has("item_init")) {
+    database.exec("ALTER TABLE options ADD COLUMN item_init INTEGER NOT NULL DEFAULT 0 CHECK (item_init IN (0, 1))");
   }
   if (!columns.has("description")) {
     database.exec("ALTER TABLE options ADD COLUMN description TEXT NOT NULL DEFAULT ''");

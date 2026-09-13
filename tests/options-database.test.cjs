@@ -11,7 +11,8 @@ const { optionWrites } = require('../dist/option-writes');
 const schema = readFileSync(path.join(__dirname, '../database/schema.sql'), 'utf8');
 const dump = readFileSync(path.join(__dirname, '../database/options-dump.sql'), 'utf8');
 const rows = database => database.prepare('SELECT * FROM options ORDER BY id').all().map(row => {
-  // Account for the newly backfilled column when comparing legacy snapshots.
+  // Account for defaulted/backfilled columns when comparing legacy snapshots.
+  row.item_init ??= 0;
   row.writes_json ??= JSON.stringify(optionWrites({ ...row, rawJson: !!row.raw_json,
     primaryWrite: JSON.parse(row.primary_write_json || 'null'), additionalWrites: JSON.parse(row.additional_writes_json || '[]') }));
   return row;

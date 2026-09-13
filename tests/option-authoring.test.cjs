@@ -97,15 +97,17 @@ test('clearing an address omits it and invalid addresses identify the offending 
 
 test('placement choices are exclusive and JSON mode excludes write-specific fields', () => {
   const draft = optionDraft(base);
-  for (const placement of ['default', 'game-init', 'after-relics']) {
+  for (const placement of ['default', 'game-init', 'item-init', 'after-relics']) {
     const input = draftInput({ ...draft, placement });
     assert.equal(!!input.gameInit, placement === 'game-init');
+    assert.equal(!!input.itemInit, placement === 'item-init');
     assert.equal(!!input.statEdit, placement === 'after-relics');
+    assert.equal(optionDraft(stored(input)).placement, placement);
   }
   const input = draftInput({ ...draft, rawJson: true, json: '{"enemyDrops":true}' });
   assert.equal(input.rawJson, true);
   assert.deepEqual(input.writes, []);
-  for (const field of ['address', 'primaryWrite', 'additionalWrites', 'gameInit', 'statEdit']) assert.equal(input[field], undefined);
+  for (const field of ['address', 'primaryWrite', 'additionalWrites', 'gameInit', 'itemInit', 'statEdit']) assert.equal(input[field], undefined);
   assert.throws(() => draftInput({ ...draft, rawJson: true, json: '[]' }), /must be an object/);
   assert.throws(() => draftInput({ ...draft, rawJson: true, json: '{' }), /valid JSON/);
 });
