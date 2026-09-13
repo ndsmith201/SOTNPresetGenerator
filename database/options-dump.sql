@@ -135,129 +135,47 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
 
 INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (48, 'Open Non-Complexity Altering Shortcuts', 'world', 'word', '0x34020001', NULL, 1, 0, '[{"type":"word","value":"0xa062BE6F"},{"type":"word","value":"0xa062BE80"},{"type":"word","value":"0xa062BE9D"},{"type":"word","value":"0xa062BDFC"},{"type":"word","value":"0xa062BE1D"}]', '2026-09-08 03:00:53', '2026-09-08 03:07:31', 0, 'Opens Alchemy Lab Cannon, Attic Stairs, Colosseum to Royal Chapel, Outer Wall Elevator, Forbidden Route', 1, NULL, '[{"comment":"Open Non-Complexity Altering Shortcuts","type":"word","value":"0x34020001"},{"type":"word","value":"0xa062BE6F"},{"type":"word","value":"0xa062BE80"},{"type":"word","value":"0xa062BE9D"},{"type":"word","value":"0xa062BDFC"},{"type":"word","value":"0xa062BE1D"}]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (52, 'MP Gain', 'challenge', 'char', '01', '0x00117856', 0, 0, '[{"type":"char","value":"01","address":"0x00117858"}]', '2026-09-11 16:37:31', '2026-09-12 05:57:26', 0, 'Reduces how much MP you gain on level up', 0, '{"type":"char","value":"01","comment":"Slow MP Gain","address":"0x00117856"}', '[{"type":"char","value":"01","comment":"Slow MP Gain","address":"0x00117856"},{"type":"char","value":"01","address":"0x00117858"}]');
-
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (53, 'No Good Weapons', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (53, 'No Good Weapon Finds', 'challenge', 'word', '{
   "blockItems": [{
     "zone": "*",
     "item": "*",
     "replacement": [
-      "Crissaegrim",
-      "Library card",
-      "Vorpal blade",
-      "Gurthang",
-      "Masamune",
-      "Osafune katana",
-      "Mablung Sword",
-      "Duplicator",
-      "Yasutsuna",
-      "Mourneblade",
-      "Alucard shield",
-      "God''s Garb",
-      "Mojo mail",
-      "Fury plate",
-      "Alucard mail",
-      "Muramasa",
-      "Fist of Tulkas",
-      "Ring of Varda",
-      "Ring of Ares",
-      "Resist stone",
-      "Resist holy",
-      "Resist thunder",
-      "Resist fire",
-      "Resist ice",
-      "Resist dark",
-      "Toadstool",
-      "Rapier",
+      "Alucard sword",
+      "Alucart sword",
       "Badelaire",
-      "Alucart mail",
-      "Sword of Dawn"
+      "Crissaegrim",
+      "Dark Blade",
+      "Firebrand",
+      "Gram",
+      "Gurthang",
+      "Harper",
+      "Holy sword",
+      "Icebrand",
+      "Luminus",
+      "Mablung Sword",
+      "Marsil",
+      "Mormegil",
+      "Mourneblade",
+      "Sword of Hador",
+      "Terminus Est",
+      "Thunderbrand",
+      "Vorpal blade",
+      "Combat knife",
+      "Rapier",
+      "Stone sword",
+      "Were Bane",
+      "Runesword",
+      "Great Sword",
+      "Masamune",
+      "Obsidian sword",
+      "Osafune katana",
+      "Yasutsuna",
+      "Zwei hander",
+      "Shield rod",
+      "Duplicator"
     ]
   }]
-}', NULL, 0, 1, NULL, '2026-09-11 16:47:47', '2026-09-11 16:59:26', 0, 'One mans trash is another mans...well trash', 0, NULL, '[]');
-
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (54, 'No Good Starting Weapons', 'challenge', 'word', '{
-  "blockEquipment": [
-    {
-      "slot": "Right hand",
-      "item": [
-        "Crissaegrim",
-        "Vorpal blade",
-        "Gurthang",
-        "Masamune",
-        "Osafune katana",
-        "Mablung Sword",
-        "Estoc",
-        "Yasutsuna",
-        "Mourneblade",
-        "Jewel sword",
-        "Muramasa",
-        "Fist of Tulkas",
-        "Alucard sword",
-        "Terminus Est",
-        "Runesword"
-      ]
-    },
-    {
-      "slot": "Left hand",
-      "item": [
-        "Alucard shield",
-        "Medusa shield",
-        "Fire shield",
-        "Iron shield"
-      ]
-    },
-    {
-      "slot": "Head",
-      "item": [
-        "Beryl circlet",
-        "Dragon helm",
-        "Ruby circlet",
-        "Gold circlet",
-        "Wizard hat"
-      ]
-    },
-    {
-      "slot": "Body",
-      "item": [
-        "God''s Garb",
-        "Mojo mail",
-        "Fury plate",
-        "Alucard mail",
-        "Dark armor",
-        "Hide cuirass",
-        "Dracula tunic",
-        "Diamond plate"
-      ]
-    },
-    {
-      "slot": "Cloak",
-      "item": [
-        "Twilight cloak",
-        "Royal cloak",
-        "Joseph''s cloak"
-      ]
-    },
-    {
-      "slot": "Other",
-      "item": [
-        "Duplicator",
-        "Ring of Feanor",
-        "Ring of Varda",
-        "Moonstone",
-        "Gauntlet",
-        "King''s stone",
-        "Covenant stone",
-        "Ring of Ares",
-        "Nauglamir",
-        "Onyx",
-        "Garnet",
-        "Opal",
-        "Diamond"
-      ]
-    }
-  ]
-}', NULL, 0, 1, NULL, '2026-09-11 17:00:46', '2026-09-11 17:33:12', 0, '', 0, NULL, '[]');
+}', NULL, 0, 1, NULL, '2026-09-11 16:47:47', '2026-09-13 03:50:38', 0, 'Prevents drops of top tier from spawning as a pickup', 0, NULL, '[]');
 
 INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (55, 'Nimble Equipment', 'items', 'word', '{"startingEquipment": [{
     "slot": "Right hand",
@@ -279,25 +197,42 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
     "item": "Duplicator"
   }]}', NULL, 0, 1, NULL, '2026-09-11 17:54:59', '2026-09-12 05:52:14', 0, 'Starts Alucard with Manna Prism, Buffalo Star, Dragon Helm, Alucard Mail, Twilight Cloak, and Duplicator', 0, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (56, 'No Good Weapons', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (56, 'No Good Starting Equipment', 'challenge', 'word', '{
   "blockEquipment": [{
     "slot": "Right hand",
     "item": [
-      "Crissaegrim",
-      "Vorpal blade",
-      "Gurthang",
-      "Masamune",
-      "Osafune katana",
-      "Mablung Sword",
-      "Estoc",
-      "Yasutsuna",
-      "Mourneblade",
-      "Jewel sword",
-      "Muramasa",
-      "Fist of Tulkas",
       "Alucard sword",
+      "Alucart sword",
+      "Badelaire",
+      "Crissaegrim",
+      "Dark Blade",
+      "Firebrand",
+      "Gram",
+      "Gurthang",
+      "Harper",
+      "Holy sword",
+      "Icebrand",
+      "Luminus",
+      "Mablung Sword",
+      "Marsil",
+      "Mormegil",
+      "Mourneblade",
+      "Sword of Hador",
       "Terminus Est",
-      "Runesword"
+      "Thunderbrand",
+      "Vorpal blade",
+      "Combat knife",
+      "Rapier",
+      "Stone sword",
+      "Were Bane",
+      "Runesword",
+      "Great Sword",
+      "Masamune",
+      "Obsidian sword",
+      "Osafune katana",
+      "Yasutsuna",
+      "Zwei hander",
+      "Shield rod"
     ]
   }, {
     "slot": "Left hand",
@@ -352,44 +287,8 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
       "Opal",
       "Diamond"
     ]
-  }],
-  "blockItems": [{
-    "zone": "*",
-    "item": "*",
-    "replacement": [
-      "Crissaegrim",
-      "Library card",
-      "Vorpal blade",
-      "Gurthang",
-      "Masamune",
-      "Osafune katana",
-      "Mablung Sword",
-      "Duplicator",
-      "Yasutsuna",
-      "Mourneblade",
-      "Alucard shield",
-      "God''s Garb",
-      "Mojo mail",
-      "Fury plate",
-      "Alucard mail",
-      "Muramasa",
-      "Fist of Tulkas",
-      "Ring of Varda",
-      "Ring of Ares",
-      "Resist stone",
-      "Resist holy",
-      "Resist thunder",
-      "Resist fire",
-      "Resist ice",
-      "Resist dark",
-      "Toadstool",
-      "Rapier",
-      "Badelaire",
-      "Alucart mail",
-      "Sword of Dawn"
-    ]
   }]
-}', NULL, 0, 1, NULL, '2026-09-12 04:03:07', '2026-09-12 04:03:07', 0, 'One mans trash is another mans...well trash', 0, NULL, '[]');
+}', NULL, 0, 1, NULL, '2026-09-12 04:03:07', '2026-09-13 03:52:24', 0, 'Prevent starting with top tier gear', 0, NULL, '[]');
 
 INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (58, 'Slow MP Gain', 'challenge', 'char', '01', '0x00117856', 0, 0, '[{"type":"char","value":"01","address":"0x00117858"}]', '2026-09-12 06:01:06', '2026-09-12 06:01:06', 0, 'Reduces the amount of MP on level up', 0, '{"type":"char","value":"01","address":"0x00117856","comment":"Slow MP Gain"}', '[{"type":"char","value":"01","address":"0x00117856","comment":"Slow MP Gain"},{"type":"char","value":"01","address":"0x00117858"}]');
 
@@ -424,70 +323,53 @@ INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", 
     }
   ]}', NULL, 0, 1, NULL, '2026-09-12 06:32:13', '2026-09-12 06:32:13', 0, 'Starts Alucard with Shield Rod, Shaman Shield, Silver Crown, Brilliant Mail, Blood Cloak, and Mystic Pendant', 0, NULL, '[]');
 
-INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (64, 'No Good Weapon Drops', 'challenge', 'word', '{
+INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (64, 'No Good Equipment Enemy Drops', 'challenge', 'word', '{
   "blockDrops": [
     {
       "enemy": "*",
       "items": [
-        "Crissaegrim",
-        "Library card",
-        "Vorpal blade",
-        "Gurthang",
-        "Masamune",
-        "Osafune katana",
-        "Mablung Sword",
-        "Duplicator",
-        "Estoc",
-        "Yasutsuna",
-        "Mourneblade",
-        "Alucard shield",
-        "Jewel sword",
-        "Short sword",
-        "Tyrfing",
-        "Red Rust",
-        "God''s Garb",
-        "Mojo mail",
-        "Fury plate",
-        "Alucard mail",
-        "Muramasa",
-        "Fist of Tulkas",
-        "Ring of Varda",
-        "Ring of Ares",
-        "Resist stone",
-        "Resist holy",
-        "Resist thunder",
-        "Resist fire",
-        "Resist ice",
-        "Resist dark",
-        "Cloth tunic",
-        "Hide cuirass",
-        "Bronze cuirass",
-        "Toadstool",
-        "Blue knuckles",
-        "Gladius",
-        "Basilard",
-        "Leather shield",
-        "Knight shield",
-        "Rapier",
-        "Badelaire",
-        "Knuckle duster",
-        "Mace",
-        "Morningstar",
-        "Scimitar",
-        "Cutlass",
-        "Namakura",
-        "Takemitsu",
-        "Alucart mail",
-        "Sword of Dawn"
+      "Alucard sword",
+      "Alucart sword",
+      "Badelaire",
+      "Crissaegrim",
+      "Dark Blade",
+      "Firebrand",
+      "Gram",
+      "Gurthang",
+      "Harper",
+      "Holy sword",
+      "Icebrand",
+      "Luminus",
+      "Mablung Sword",
+      "Marsil",
+      "Mormegil",
+      "Mourneblade",
+      "Sword of Hador",
+      "Terminus Est",
+      "Thunderbrand",
+      "Vorpal blade",
+      "Combat knife",
+      "Rapier",
+      "Stone sword",
+      "Were Bane",
+      "Runesword",
+      "Great Sword",
+      "Masamune",
+      "Obsidian sword",
+      "Osafune katana",
+      "Yasutsuna",
+      "Zwei hander",
+      "Shield rod",
+      "Duplicator"
       ]
     }
   ]
-}', NULL, 0, 1, NULL, '2026-09-12 06:32:19', '2026-09-12 06:32:19', 0, '', 0, NULL, '[]');
+}', NULL, 0, 1, NULL, '2026-09-12 06:32:19', '2026-09-13 03:53:23', 0, 'Prevents top tier equipment from being dropped by enemies', 0, NULL, '[]');
 
 INSERT INTO "options" ("id", "comment", "category", "type", "value", "address", "game_init", "raw_json", "additional_writes_json", "created_at", "updated_at", "stat_edit", "description", "read_only", "primary_write_json", "writes_json") VALUES (65, 'ABRSR', 'world', 'word', '{"newGoalsSet": "x"}', NULL, 0, 1, NULL, '2026-09-12 06:32:25', '2026-09-12 06:32:25', 0, '', 0, NULL, '[]');
 
 DELETE FROM sqlite_sequence WHERE name = 'options';
 
-INSERT INTO sqlite_sequence (name, seq) VALUES ('options', 65);
+INSERT INTO sqlite_sequence (name, seq) VALUES ('options', 66);
 
 COMMIT;
