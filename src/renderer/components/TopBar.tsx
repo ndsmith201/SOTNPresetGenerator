@@ -30,7 +30,6 @@ export function TopBar(props: TopBarProps) {
       </div>
       {props.communityActions ? <div className="topbar-actions">{props.communityActions}</div> : !props.editing ? (
         <div className="topbar-actions">
-          <span className="preset-total"><strong>{props.presetCount}</strong> presets</span>
           <button className="button button-primary" type="button" onClick={props.onNewPreset}><Icon name="plus" />New preset</button>
         </div>
       ) : (

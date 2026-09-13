@@ -107,8 +107,20 @@ test('Generate requires a successful export of this draft, JSON, and directory',
   assert.equal(exportMatchesCurrent(exported, 'draft-a', 'rando', '{"music":false}'), false);
 });
 
+test('the presets page toolbar shows New preset without a preset count', () => {
+  for (const presetCount of [0, 7]) {
+    const markup = renderToStaticMarkup(React.createElement(TopBar, {
+      editing: false, presetCount, exporting: false, generating: false, canGenerate: false
+    }));
+    const buttons = [...markup.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)]
+      .map((match) => match[1].replace(/<[^>]*>/g, '').trim());
+    assert.deepEqual(buttons, ['New preset']);
+    assert.doesNotMatch(markup.replace(/<[^>]*>/g, ''), /\d+\s*presets/);
+  }
+});
+
 test('Generate sits immediately after Export with a disabled hover/focus tooltip until built', () => {
-  const props = { editing: true, presetCount: 1, exporting: false, generating: false, canGenerate: false };
+  const props = { editing: true, exporting: false, generating: false, canGenerate: false };
   const markup = renderToStaticMarkup(React.createElement(TopBar, props));
   assert(markup.indexOf('Export</button>') < markup.indexOf('Generate</button>'));
   assert(markup.indexOf('Generate</button>') < markup.indexOf('Save preset</button>'));
