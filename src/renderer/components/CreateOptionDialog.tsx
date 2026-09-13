@@ -3,7 +3,6 @@ import { OPTION_GROUPS, WRITE_TYPES } from "../constants";
 import type { CreateOptionInput, DatabaseOption } from "../types";
 import { draftInput, normalizeWrites, optionDraft, parseWriteSource, type OptionDraft, type WritePlacement } from "../option-authoring";
 import { Icon } from "./Icon";
-import { ImportWritesDialog } from "./ImportWritesDialog";
 
 interface CreateOptionDialogProps {
   open: boolean;
@@ -29,7 +28,6 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const importButtonRef = useRef<HTMLButtonElement>(null);
   const [step, setStep] = useState<"start" | "editor">(option ? "editor" : "start");
   const [start, setStart] = useState<"copy" | "write" | "json">("copy");
   const [query, setQuery] = useState("");
@@ -38,7 +36,6 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
   const [draft, setDraft] = useState<OptionDraft>(() => optionDraft(option));
   const [enableInPreset, setEnableInPreset] = useState(false);
   const [advancedSource, setAdvancedSource] = useState<string | null>(null);
-  const [importWritesOpen, setImportWritesOpen] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [rowAnnouncement, setRowAnnouncement] = useState("");
@@ -53,7 +50,6 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
     if (open && !dialog.open) {
       setDraft(optionDraft(option)); setStep(option ? "editor" : "start");
       setStart("copy"); setQuery(""); setSourceId(null); setCopiedFrom("");
-      setImportWritesOpen(false);
       setEnableInPreset(false); setAdvancedSource(null); setError(""); setRowAnnouncement(""); editorOrigin.current = "";
       dialog.showModal();
     } else if (!open && dialog.open) dialog.close();
@@ -97,10 +93,6 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
   const applyJson = () => {
     try { change({ writes: normalizeWrites(parseWriteSource(advancedSource ?? "")) }); setAdvancedSource(null); }
     catch (issue) { setError(issue instanceof Error ? issue.message : "Enter valid write JSON."); }
-  };
-  const closeImport = () => {
-    setImportWritesOpen(false);
-    requestAnimationFrame(() => importButtonRef.current?.focus());
   };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -159,10 +151,7 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
               <div className="dialog-field"><label htmlFor="optionDescriptionInput">Description <span className="optional-label">Optional</span></label><textarea id="optionDescriptionInput" readOnly={readOnly} rows={2} maxLength={10000} placeholder="Describe what this option does in game." value={draft.description} onChange={event => change({ description: event.target.value })} /></div>
               {draft.rawJson ? <div className="dialog-field builder-json-settings"><label htmlFor="optionJsonInput">JSON settings</label><p className="builder-help">Merge an object into the preset. Matching top-level values are replaced; nested objects are not merged recursively. Preset metadata and location filtering still apply.</p><textarea id="optionJsonInput" readOnly={readOnly} rows={12} maxLength={10000} spellCheck={false} value={draft.json} onChange={event => change({ json: event.target.value })} /></div> : <>
                 <div className="builder-section-heading"><h3>Writes</h3><span className="builder-badge">{draft.writes.length} {draft.writes.length === 1 ? "write" : "writes"}</span></div>
-                <div className="builder-writes-toolbar">
-                  <p className="builder-help">Writes run in the order shown. Each address is optional.</p>
-                  {!readOnly && <button ref={importButtonRef} className="button button-ghost button-with-icon" type="button" disabled={advancedSource !== null} onClick={() => setImportWritesOpen(true)}><Icon name="download" />Import</button>}
-                </div>
+                <p className="builder-help">Writes run in the order shown. Each address is optional.</p>
                 <div className="builder-write-list" aria-label="Write sequence">
                   {draft.writes.map((write, index) => <div className="builder-write-row" key={index} tabIndex={-1} role="group" aria-label={`Write ${index + 1}`} onDragOver={event => { if (!readOnly && advancedSource === null) event.preventDefault(); }} onDrop={event => { event.preventDefault(); if (dragIndex.current !== null && advancedSource === null) moveWrite(dragIndex.current, index); dragIndex.current = null; }}>
                     <div className="builder-write-order"><span className="builder-grip" draggable={!readOnly && !submitting && advancedSource === null} title={readOnly ? `Write ${index + 1}` : "Drag to reorder"} onDragStart={event => { dragIndex.current = index; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(index)); }} onDragEnd={() => { dragIndex.current = null; }}>{index + 1}</span>
@@ -197,13 +186,7 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
       <span className="builder-sr-only" aria-live="polite">{rowAnnouncement}</span>
     </form>;
 
-  return <>{inline ? <section className="option-dialog option-builder option-builder-inline" aria-labelledby="optionDialogTitle">{form}</section> :
+  return inline ? <section className="option-dialog option-builder option-builder-inline" aria-labelledby="optionDialogTitle">{form}</section> :
     <dialog className="preset-dialog option-dialog option-builder" ref={dialogRef} aria-labelledby="optionDialogTitle"
-      onCancel={event => { event.preventDefault(); close(); }}>{form}</dialog>}
-    {open && !readOnly && importWritesOpen && <ImportWritesDialog onClose={closeImport} onImport={writes => {
-      change({ writes });
-      closeImport();
-      setRowAnnouncement(`Imported ${writes.length} ${writes.length === 1 ? "write" : "writes"}.`);
-    }} />}
-  </>;
+      onCancel={event => { event.preventDefault(); close(); }}>{form}</dialog>;
 }

@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');
 const path = require('node:path');
-const { optionDraft, draftInput, normalizeWrites, parseWriteSource, parseWriteImport } = require('../dist/renderer/option-authoring');
+const { optionDraft, draftInput, normalizeWrites, parseWriteSource } = require('../dist/renderer/option-authoring');
 const { toPresetOptions } = require('../dist/renderer/preset-utils');
 const { initializeOptionsCatalog } = require('../dist/options-database');
 const { optionSubmission } = require('../dist/community-options');
@@ -11,44 +11,6 @@ const { optionSubmission } = require('../dist/community-options');
 const base = { id: 1, readOnly: true, comment: 'Source', description: 'Original', category: 'gameplay', type: 'word', value: '0x34020063', address: null, gameInit: false, statEdit: true, rawJson: false, additionalWrites: [{ type: 'short', value: 0, address: '0x1234', comment: 'Independent note', custom: { keep: true } }] };
 const stored = input => ({ id: 2, readOnly: false, address: null, gameInit: false, statEdit: false, rawJson: false, additionalWrites: [], ...input });
 const legacyCatalog = fs.readFileSync(path.join(__dirname, 'fixtures/legacy-options.sql'), 'utf8');
-
-test('write imports accept arrays and pasted object lists with optional addresses and notes', () => {
-  const writes = [
-    { comment: 'Card Names Ptr. Faerie Card', type: 'word', address: '0xB57B8', value: '0x800DFFE0' },
-    { type: 'word', value: '0x800E02B0' },
-    { comment: 'Card Names Ptr. Demon Card', type: 'word', address: '0xB57C8', value: '0x800E0074' },
-    { type: 'word', value: '0x800E0284' },
-    { comment: 'Card Names Ptr. Sword Card', type: 'word', address: '0xB57D8', value: '0x800E003C' },
-    { type: 'word', value: '0x800E0258' },
-    { comment: 'Card Names Ptr. Nosedevil Card', type: 'word', address: '0xB57F8', value: '0x800E00D4' },
-    { type: 'word', value: '0x800E01FC' },
-    { comment: 'Shorten Dark Metamorphosis', type: 'char', address: '0xF540A', value: '0x00' }
-  ];
-  const array = JSON.stringify(writes, null, 2);
-  const objects = array.trim().slice(1, -1);
-  for (const source of [array, objects, objects.replace(/^ +/gm, spaces => '\u00a0'.repeat(spaces.length))]) {
-    const imported = parseWriteImport(source);
-    assert.deepEqual(imported, writes);
-    const input = draftInput({ ...optionDraft(), comment: 'Imported patch', writes: imported });
-    assert.deepEqual(input.writes, writes);
-  }
-});
-
-test('write imports preserve string whitespace and extra properties while normalizing fields', () => {
-  const write = { comment: 'Note "quoted"\u00a0text', type: 'word', address: 4096, value: 0, custom: { keep: true } };
-  const source = JSON.stringify(write, null, 2).replace(/^ +/gm, spaces => '\u202f'.repeat(spaces.length));
-  assert.deepEqual(parseWriteImport(source), [{ ...write, address: '0x1000' }]);
-});
-
-test('invalid write imports report JSON and row errors before updating the draft', () => {
-  for (const source of ['', '[]', 'null', '[1]', '[[]]']) {
-    assert.throws(() => parseWriteImport(source), /write object/);
-  }
-  assert.throws(() => parseWriteImport('{"type":'), /Enter valid JSON/);
-  assert.throws(() => parseWriteImport('{"type":"invalid","value":0}'), /Write 1: choose a valid type/);
-  assert.throws(() => parseWriteImport('{"type":"word","value":""}'), /Write 1: enter a value/);
-  assert.throws(() => parseWriteImport('{"type":"word","value":0}, {"type":"char","value":0,"address":"invalid"}'), /Write 2: address/);
-});
 
 test('copy, reorder, save and reopen preserve per-write addresses, notes and extra fields', () => {
   const original = structuredClone(base);
