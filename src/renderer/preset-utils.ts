@@ -22,6 +22,7 @@ import type {
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
 import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
+import { ensureItemInitialization } from "./item-initialization";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -51,10 +52,19 @@ export function normalizeComplexity(value: unknown, maximum = Number.MAX_SAFE_IN
   return Math.min(maximum, Math.max(Math.min(MIN_COMPLEXITY, maximum), candidate));
 }
 
+const STARTING_EQUIPMENT_REQUIREMENTS = new Map([
+  ["Start with Gold Ring", "Gold ring"],
+  ["Start with Silver Ring", "Silver ring"],
+  ["Start with Holy Glasses", "Holy glasses"]
+]);
+
 function getEnabledRelics(selected: PresetOption[], template: JsonObject | null = null): Set<string> {
-  return new Set([...detectStartingRelics(template), ...selected
-    .filter((option) => option.category === "relics" && option.label.startsWith("Enable "))
-    .map((option) => option.label.slice("Enable ".length).trim())]);
+  return new Set([...detectStartingRelics(template), ...selected.flatMap((option) => {
+    const equipment = STARTING_EQUIPMENT_REQUIREMENTS.get(option.label);
+    if (equipment) return [equipment];
+    return option.category === "relics" && option.label.startsWith("Enable ")
+      ? [option.label.slice("Enable ".length).trim()] : [];
+  })]);
 }
 
 /** Longest sequence of check-opening pickups, plus final Vlad completion.
@@ -264,6 +274,7 @@ export function isDatabaseOption(value: unknown): value is DatabaseOption {
     OPTION_GROUPS.some((group) => group.id === value.category) &&
     (!value.rawJson || typeof value.value === "string") &&
     typeof value.gameInit === "boolean" &&
+    (value.itemInit === undefined || typeof value.itemInit === "boolean") &&
     typeof value.statEdit === "boolean" &&
     typeof value.rawJson === "boolean" &&
     Array.isArray(value.writes) &&
@@ -284,7 +295,8 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
       }
     }
     const writes = option.writes;
-    const injectRelicWrites = !option.rawJson && !option.gameInit &&
+    const itemInit = !option.rawJson && Boolean(option.itemInit);
+    const injectRelicWrites = !option.rawJson && !option.gameInit && !itemInit &&
       (option.statEdit || (option.category === "relics" && !writes[0]?.address));
     return {
       id: `option:${option.id}`,
@@ -292,8 +304,9 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
       description: option.description ?? "",
       category: option.category,
       injectedWrites: injectRelicWrites ? writes : [],
-      gameInitWrites: option.gameInit ? writes : [],
-      appendedWrites: injectRelicWrites || option.gameInit || option.rawJson ? [] : writes,
+      gameInitWrites: option.gameInit && !itemInit ? writes : [],
+      itemInitWrites: itemInit ? writes : [],
+      appendedWrites: injectRelicWrites || option.gameInit || itemInit || option.rawJson ? [] : writes,
       previewJson,
       source: structuredClone(option)
     };
@@ -457,6 +470,19 @@ export function buildPreviewPreset(
   const templateWrites = Array.isArray(sourceWrites)
     ? sourceWrites.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
+  const itemInit = additions.flatMap(option => structuredClone(option.itemInitWrites ?? []));
+  if (itemInit.length > 0) {
+    const { start, end } = ensureItemInitialization(templateWrites);
+    // Older copies of the armor block can reset startup to the save instruction.
+    if (templateWrites[start].address !== undefined &&
+      Number(templateWrites[end + 1]?.address) === Number(templateWrites[start].address)) delete templateWrites[end + 1].address;
+    const firstAddressedWrite = itemInit.findIndex(write => write.address !== undefined);
+    if (firstAddressedWrite >= 0 && templateWrites[end].address === undefined) {
+      const address = writeLocations([...templateWrites.slice(0, end), ...itemInit.slice(0, firstAddressedWrite), templateWrites[end]]).at(-1)?.address;
+      if (address !== undefined) templateWrites[end].address = `0x${address.toString(16).padStart(8, "0")}`;
+    }
+    templateWrites.splice(end, 0, ...itemInit);
+  }
   // Keep each option's writes together, with all stat edits following the relics.
   const injectionOrder = [
     ...additions.filter((option) => !option.source?.statEdit),

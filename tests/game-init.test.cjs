@@ -13,6 +13,7 @@ const [bat, teleporters, shortcuts] = toPresetOptions([
 ]);
 const options = [bat, teleporters, shortcuts];
 const anchorIndex = (writes) => writes.findIndex((write) => Number(write.value) === 0x3c038004);
+const templateAnchorIndex = anchorIndex(template.writes);
 
 function generate(source, selected = options) {
   const preset = createPresetFromTemplate("Game init", source, options);
@@ -25,7 +26,7 @@ test("default generation keeps the anchor between relic grants and game init wri
   const output = generate();
   const index = anchorIndex(output.writes);
   assert.deepEqual(output.writes.slice(index - 1, index + 5), [
-    ...bat.injectedWrites, template.writes[3], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites
+    ...bat.injectedWrites, template.writes[templateAnchorIndex], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites
   ]);
   assert.ok(detectStartingRelics(output).has("Soul of Bat"));
   assert.deepEqual(template, original);
@@ -56,7 +57,7 @@ test("installed presets without an anchor initialize the game bank before new ga
   const index = anchorIndex(output.writes);
   assert.ok(index > 0);
   assert.deepEqual(output.writes.slice(index - 1, index + 5), [
-    ...bat.injectedWrites, template.writes[3], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites
+    ...bat.injectedWrites, template.writes[templateAnchorIndex], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites
   ]);
   assert.equal(output.writes[index + 5].value, "0x0803924f");
   assert.ok(detectStartingRelics(output).has("Soul of Bat"));
@@ -67,11 +68,11 @@ test("installed presets without an anchor initialize the game bank before new ga
 test("existing anchors are recognized without comments and with numeric or uppercase values", () => {
   for (const value of ["0x3C038004", 0x3c038004, "0x3c038004"]) {
     const source = structuredClone(template);
-    source.writes[3] = { type: "word", value };
+    source.writes[templateAnchorIndex] = { type: "word", value };
     const output = generate(source);
     const index = anchorIndex(output.writes);
     assert.equal(output.writes.filter((write) => Number(write.value) === 0x3c038004).length, 1);
-    assert.deepEqual(output.writes[index], source.writes[3]);
+    assert.deepEqual(output.writes[index], source.writes[templateAnchorIndex]);
     assert.deepEqual(output.writes.slice(index + 1, index + 5), [...teleporters.gameInitWrites, ...shortcuts.gameInitWrites]);
     assert.ok(detectStartingRelics(output).has("Soul of Bat"));
   }
@@ -79,14 +80,14 @@ test("existing anchors are recognized without comments and with numeric or upper
 
 test("reopening an affected preset restores the anchor before inherited game init options without duplicating them", () => {
   const source = { writes: [
-    ...template.writes.slice(0, 3), ...bat.injectedWrites, ...teleporters.gameInitWrites,
-    ...template.writes.slice(4)
+    ...template.writes.slice(0, templateAnchorIndex), ...bat.injectedWrites, ...teleporters.gameInitWrites,
+    ...template.writes.slice(templateAnchorIndex + 1)
   ] };
   const original = structuredClone(source);
   const output = generate(source);
   const index = anchorIndex(output.writes);
   assert.deepEqual(output.writes.slice(index - 1, index + 5), [
-    ...bat.injectedWrites, template.writes[3], ...shortcuts.gameInitWrites, ...teleporters.gameInitWrites
+    ...bat.injectedWrites, template.writes[templateAnchorIndex], ...shortcuts.gameInitWrites, ...teleporters.gameInitWrites
   ]);
   assert.equal(output.writes.length, source.writes.length + shortcuts.gameInitWrites.length + 1);
   assert.deepEqual(source, original);
@@ -102,16 +103,16 @@ test("restoring a missing or late anchor preserves the return address around add
   for (const lateAnchor of [false, true]) {
     const source = { writes: [
       ...template.writes.filter((write) => Number(write.value) !== 0x3c038004),
-      ...(lateAnchor ? [template.writes[3]] : [])
+      ...(lateAnchor ? [template.writes[templateAnchorIndex]] : [])
     ] };
     const original = structuredClone(source);
     const preset = createPresetFromTemplate("Patched game init", source, catalog);
     preset.optionIds = catalog.map((option) => option.id);
     const output = buildPreviewPreset(template, preset, catalog);
-    assert.deepEqual(output.writes.slice(3), [
-      ...bat.injectedWrites, template.writes[3], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites,
-      ...patch.appendedWrites, { ...template.writes.at(-2), address: "0x00158cb8" }, template.writes.at(-1),
-      ...(lateAnchor ? [template.writes[3]] : [])
+    assert.deepEqual(output.writes.slice(templateAnchorIndex), [
+      ...bat.injectedWrites, template.writes[templateAnchorIndex], ...teleporters.gameInitWrites, ...shortcuts.gameInitWrites,
+      ...patch.appendedWrites, { ...template.writes.at(-2), address: "0x00158cc0" }, template.writes.at(-1),
+      ...(lateAnchor ? [template.writes[templateAnchorIndex]] : [])
     ]);
     assert.ok(detectStartingRelics(output).has("Soul of Bat"));
     assert.deepEqual(source, original);

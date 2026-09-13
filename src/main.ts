@@ -30,12 +30,12 @@ type WriteType = (typeof WRITE_TYPES)[number];
 
 interface StoredOption {
   id: number; comment: string; description: string; readOnly: boolean;
-  category: OptionCategory; value?: string; gameInit: boolean; statEdit: boolean;
+  category: OptionCategory; value?: string; gameInit: boolean; itemInit: boolean; statEdit: boolean;
   rawJson: boolean; writes: Record<string, unknown>[];
 }
 interface StoredOptionRow {
   id: number; comment: string; description: string; category: OptionCategory;
-  value: string; read_only: number; game_init: number; stat_edit: number;
+  value: string; read_only: number; game_init: number; item_init: number; stat_edit: number;
   raw_json: number; writes_json: string;
 }
 
@@ -64,15 +64,15 @@ async function initializeOptionsDatabase(): Promise<void> {
 function listOptions(): StoredOption[] {
   const rows = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, value, game_init, stat_edit, raw_json, writes_json FROM options ORDER BY category, comment, id"
+      "SELECT id, comment, description, read_only, category, value, game_init, item_init, stat_edit, raw_json, writes_json FROM options ORDER BY category, comment, id"
     )
     .all() as unknown as StoredOptionRow[];
   return rows.map(hydrateStoredOption);
 }
 
 function hydrateStoredOption(row: StoredOptionRow): StoredOption {
-  const { writes_json: writesJson, read_only: readOnly, game_init: gameInit, stat_edit: statEdit, raw_json: rawJson, ...option } = row;
-  return unifiedOption({ ...option, readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), writes: JSON.parse(writesJson) }) as unknown as StoredOption;
+  const { writes_json: writesJson, read_only: readOnly, game_init: gameInit, item_init: itemInit, stat_edit: statEdit, raw_json: rawJson, ...option } = row;
+  return unifiedOption({ ...option, readOnly: Boolean(readOnly), gameInit: Boolean(gameInit), itemInit: Boolean(itemInit), statEdit: Boolean(statEdit), rawJson: Boolean(rawJson), writes: JSON.parse(writesJson) }) as unknown as StoredOption;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -93,6 +93,7 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   const value = typeof candidate.value === "string" ? candidate.value.trim() : "";
   const rawJson = candidate.rawJson ?? false;
   const requestedGameInit = candidate.gameInit ?? false;
+  const requestedItemInit = candidate.itemInit ?? false;
   const requestedStatEdit = candidate.statEdit ?? false;
   const writes = optionWrites(candidate);
 
@@ -101,6 +102,7 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
   if (rawJson && !value) throw new Error("Enter JSON settings.");
   if (typeof rawJson !== "boolean") throw new Error("Raw JSON must be a checkbox value.");
   if (typeof requestedGameInit !== "boolean") throw new Error("Game init must be a checkbox value.");
+  if (typeof requestedItemInit !== "boolean") throw new Error("Item init must be a checkbox value.");
   if (typeof requestedStatEdit !== "boolean") throw new Error("Edits stats must be a checkbox value.");
   if (!rawJson && (writes.length < 1 || writes.length > 257)) throw new Error("Use between 1 and 257 writes.");
   for (const [index, write] of writes.entries()) {
@@ -118,16 +120,17 @@ function validateOptionRequest(request: unknown): Omit<StoredOption, "id" | "rea
     if (!isRecord(parsed)) throw new Error("Raw JSON must be a JSON object.");
   }
 
-  const gameInit = rawJson ? false : requestedGameInit;
-  const statEdit = rawJson || gameInit ? false : requestedStatEdit;
-  return { comment, description, category: category as OptionCategory, ...(rawJson ? { value } : {}), gameInit, statEdit, rawJson, writes };
+  const itemInit = rawJson ? false : requestedItemInit;
+  const gameInit = rawJson || itemInit ? false : requestedGameInit;
+  const statEdit = rawJson || itemInit || gameInit ? false : requestedStatEdit;
+  return { comment, description, category: category as OptionCategory, ...(rawJson ? { value } : {}), gameInit, itemInit, statEdit, rawJson, writes };
 
 }
 
 function loadOption(id: number): StoredOption {
   const row = getOptionsDatabase()
     .prepare(
-      "SELECT id, comment, description, read_only, category, value, game_init, stat_edit, raw_json, writes_json FROM options WHERE id = ?"
+      "SELECT id, comment, description, read_only, category, value, game_init, item_init, stat_edit, raw_json, writes_json FROM options WHERE id = ?"
     )
     .get(id) as unknown as StoredOptionRow | undefined;
   if (!row) throw new Error("The option could not be found.");
@@ -140,9 +143,9 @@ function createOption(request: unknown): StoredOption {
 
   const result = getOptionsDatabase()
     .prepare(
-      "INSERT INTO options (comment, description, category, type, value, game_init, stat_edit, raw_json, writes_json) VALUES (?, ?, ?, 'word', ?, ?, ?, ?, ?)"
+      "INSERT INTO options (comment, description, category, type, value, game_init, item_init, stat_edit, raw_json, writes_json) VALUES (?, ?, ?, 'word', ?, ?, ?, ?, ?, ?)"
     )
-    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson);
+    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.itemInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson);
   return loadOption(Number(result.lastInsertRowid));
 }
 
@@ -153,9 +156,9 @@ function updateOption(id: unknown, request: unknown): StoredOption {
   const writesJson = JSON.stringify(option.writes);
   const result = getOptionsDatabase()
     .prepare(
-      "UPDATE options SET comment = ?, description = ?, category = ?, type = 'word', value = ?, address = NULL, game_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = NULL, primary_write_json = NULL, writes_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
+      "UPDATE options SET comment = ?, description = ?, category = ?, type = 'word', value = ?, address = NULL, game_init = ?, item_init = ?, stat_edit = ?, raw_json = ?, additional_writes_json = NULL, primary_write_json = NULL, writes_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND read_only = 0"
     )
-    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson, id);
+    .run(option.comment, option.description, option.category, option.value ?? '0', option.gameInit ? 1 : 0, option.itemInit ? 1 : 0, option.statEdit ? 1 : 0, option.rawJson ? 1 : 0, writesJson, id);
   if (result.changes !== 1) throw new Error("The option could not be found.");
   return loadOption(id);
 }

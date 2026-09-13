@@ -23,6 +23,7 @@ import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTempl
 import type { CreateOptionInput, DatabaseOption, InstalledPreset, JsonObject, Preset, PresetOption } from "./types";
 import { selectTemplateOptions } from "./template-options";
 import { exportMatchesCurrent, type SuccessfulExport } from "./export-state";
+import { sortPresetOptions } from "./option-catalog";
 import type { CatalogItem, CommunityStatus } from "../community-types";
 import { communityRequest, subscribeCommunityStatus } from "./community-api";
 import { communityItemName } from "./components/CommunityPresets";
@@ -36,7 +37,7 @@ async function fetchOptions(): Promise<PresetOption[]> {
   if (!isJsonObject(response)) throw new Error("Invalid response from the options database.");
   if (response.status === "error" && typeof response.error === "string") throw new Error(response.error);
   if (response.status !== "ok" || !Array.isArray(response.options)) throw new Error("The options database returned invalid data.");
-  return toPresetOptions(response.options.map(option => isJsonObject(option) ? unifiedOption(option) : option).filter(isDatabaseOption));
+  return sortPresetOptions(toPresetOptions(response.options.map(option => isJsonObject(option) ? unifiedOption(option) : option).filter(isDatabaseOption)));
 }
 
 export function App() {
@@ -338,7 +339,7 @@ export function App() {
     const expectedStatus = editingOption ? "updated" : "created";
     if (result.status !== expectedStatus || !isDatabaseOption(result.option)) throw new Error(`The option could not be ${editingOption ? "updated" : "created"}.`);
     const savedOption = toPresetOptions([result.option])[0];
-    setOptions(current => [...current.filter(item => item.id !== savedOption.id), savedOption].sort((a, b) => a.label.localeCompare(b.label)));
+    setOptions(current => sortPresetOptions([...current.filter(item => item.id !== savedOption.id), savedOption]));
     if (!editingOption && enableInPreset && activePresetId) {
       setPresets(current => current.map(preset => preset.id === activePresetId ? { ...preset, optionIds: [...new Set([...preset.optionIds, savedOption.id])], updatedAt: new Date().toISOString() } : preset));
     }
