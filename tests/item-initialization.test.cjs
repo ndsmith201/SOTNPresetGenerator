@@ -105,9 +105,14 @@ test('existing and newly installed databases persist the item-init flag through 
     try {
       if (installed) db.exec(dump);
       await initializeOptionsCatalog(db, schema, async () => dump);
-      assert.equal(db.prepare('SELECT count(*) AS count FROM options WHERE item_init <> 0').get().count, 0);
+      const snapshot = new DatabaseSync(':memory:');
+      try {
+        snapshot.exec(dump);
+        assert.deepEqual(db.prepare('SELECT id, item_init FROM options ORDER BY id').all(),
+          snapshot.prepare('SELECT id, item_init FROM options ORDER BY id').all());
+      } finally { snapshot.close(); }
       db.prepare("INSERT INTO options (comment, category, type, value, writes_json, item_init) VALUES ('Item init', 'items', 'word', '0', ?, 1)").run(JSON.stringify(items));
-      await initializeOptionsCatalog(db, schema, async () => { throw new Error('Do not reload snapshot'); });
+      await initializeOptionsCatalog(db, schema, async () => dump);
       const stored = db.prepare("SELECT item_init, writes_json FROM options WHERE comment = 'Item init'").get();
       assert.equal(stored.item_init, 1);
       assert.deepEqual(JSON.parse(stored.writes_json), items);

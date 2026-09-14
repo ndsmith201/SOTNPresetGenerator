@@ -40,7 +40,7 @@ const reviewedRows = database => rows(database).map(row => {
   if (reviewedDescriptions.has(row.id)) row.description = reviewedDescriptions.get(row.id);
   return row;
 });
-const noDump = async () => { throw new Error('Existing installs must not load the snapshot'); };
+const loadDump = async () => dump;
 
 test('first installation loads every snapshot field and subsequent launches preserve edits and deletions', async () => {
   const source = new DatabaseSync(':memory:');
@@ -52,10 +52,10 @@ test('first installation loads every snapshot field and subsequent launches pres
     installed.exec("UPDATE options SET comment = 'User edit', read_only = 0 WHERE id = (SELECT MIN(id) FROM options)");
     installed.exec('DELETE FROM options WHERE id = (SELECT MAX(id) FROM options)');
     const edited = rows(installed);
-    await initializeOptionsCatalog(installed, schema, async () => { throw new Error('Existing installs must not load the snapshot'); });
+    await initializeOptionsCatalog(installed, schema, loadDump);
     assert.deepEqual(rows(installed), edited);
     installed.exec('DELETE FROM options');
-    await initializeOptionsCatalog(installed, schema, async () => { throw new Error('An empty existing catalog is still an existing installation'); });
+    await initializeOptionsCatalog(installed, schema, loadDump);
     assert.equal(rows(installed).length, 0);
   } finally { source.close(); installed.close(); }
 });
@@ -67,35 +67,39 @@ test('existing catalogs receive only the reviewed descriptions, once across rest
   try {
     database.exec(dump);
     const expected = reviewedRows(database);
-    await initializeOptionsCatalog(database, schema, noDump);
+    await initializeOptionsCatalog(database, schema, loadDump);
     assert.deepEqual(rows(database), expected, 'Skipped descriptions and every other option field stay unchanged');
     assert.equal(database.prepare('SELECT id FROM options_migrations').get().id, descriptionMigration);
     database.exec("UPDATE options SET description = 'Later description' WHERE id = 31; DELETE FROM options WHERE id = 48;");
     const later = rows(database);
     database.close();
     database = new DatabaseSync(file);
-    await initializeOptionsCatalog(database, schema, noDump);
+    await initializeOptionsCatalog(database, schema, loadDump);
     assert.deepEqual(rows(database), later, 'Completed migration must not rerun or recreate deleted entries');
     assert.equal(database.prepare('SELECT COUNT(*) AS count FROM options_migrations').get().count, 1);
   } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('description migration protects local options, reused IDs, and missing built-ins', async () => {
+test('first refresh replaces registered options and protects editable options with conflicting IDs', async () => {
   const database = new DatabaseSync(':memory:');
   try {
     database.exec(dump);
     database.exec(`
-      UPDATE options SET read_only = 0, description = 'Editable local description' WHERE id = 31;
+      UPDATE options SET read_only = 0, description = 'Editable local description', created_at = '2026-09-14' WHERE id = 31;
       UPDATE options SET comment = 'Different registered option', description = 'Keep me' WHERE id = 32;
       DELETE FROM options WHERE id = 33;
       INSERT INTO options (id, comment, description, read_only, category, type, value)
       VALUES (1000, 'Permanent Poison', 'Same name at another ID', 1, 'challenge', 'word', '1');
     `);
     const before = rows(database);
-    const expected = reviewedRows(database);
-    for (const id of [31, 32]) expected.find(row => row.id === id).description = before.find(row => row.id === id).description;
-    await initializeOptionsCatalog(database, schema, noDump);
-    assert.deepEqual(rows(database), expected);
+    await initializeOptionsCatalog(database, schema, loadDump);
+    assert.deepEqual(rows(database).find(row => row.id === 31), before.find(row => row.id === 31));
+    assert.equal(rows(database).find(row => row.id === 32).comment, 'One Hit Death');
+    assert.equal(rows(database).find(row => row.id === 33).comment, 'Permanent Poison');
+    assert.equal(rows(database).some(row => row.id === 1000), false);
+    const mapping = database.prepare('SELECT option_id FROM bundled_options WHERE source_id = 31').get();
+    assert.ok(mapping.option_id > 1000);
+    assert.equal(rows(database).find(row => row.id === mapping.option_id).comment, 'Death goes home');
   } finally { database.close(); }
 });
 
@@ -107,11 +111,11 @@ test('failed description migration rolls back all updates and retries without a 
     const expected = reviewedRows(database);
     database.exec(`CREATE TRIGGER reject_description BEFORE UPDATE OF description ON options
       WHEN OLD.id = 38 BEGIN SELECT RAISE(ABORT, 'Simulated migration failure'); END;`);
-    await assert.rejects(initializeOptionsCatalog(database, schema, noDump), /Simulated migration failure/);
+    await assert.rejects(initializeOptionsCatalog(database, schema, loadDump), /Simulated migration failure/);
     assert.deepEqual(rows(database), before, 'Earlier updates in the migration must roll back');
-    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM options_migrations').get().count, 0);
+    assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = 'options_migrations'").get(), undefined);
     database.exec('DROP TRIGGER reject_description');
-    await initializeOptionsCatalog(database, schema, noDump);
+    await initializeOptionsCatalog(database, schema, loadDump);
     assert.deepEqual(rows(database), expected);
     assert.equal(database.prepare('SELECT id FROM options_migrations').get().id, descriptionMigration);
   } finally { database.close(); }
@@ -119,7 +123,7 @@ test('failed description migration rolls back all updates and retries without a 
 
 test('installer includes the SQL migration and its parent directory', () => {
   const { packagerConfig } = require('../forge.config.cjs');
-  for (const file of ['/database', '/database/migrations', `/database/migrations/${descriptionMigration}`]) {
+  for (const file of ['/database', '/database/bundled-options-baseline.json', '/database/migrations', `/database/migrations/${descriptionMigration}`]) {
     assert.equal(packagerConfig.ignore(file), false, `${file} must be packaged`);
   }
   assert.equal(packagerConfig.ignore('/database/options.sqlite'), true);
@@ -135,7 +139,7 @@ test('an invalid snapshot leaves first installation retryable', async () => {
   } finally { database.close(); }
 });
 
-test('existing legacy catalogs migrate without importing release options', async () => {
+test('legacy catalogs without registration flags preserve unmatched options during refresh', async () => {
   const database = new DatabaseSync(':memory:');
   try {
     database.exec(`CREATE TABLE options (
@@ -144,9 +148,9 @@ test('existing legacy catalogs migrate without importing release options', async
       type TEXT, value TEXT, created_at TEXT, updated_at TEXT
     );
     INSERT INTO options VALUES (9, 'Legacy custom option', 'world', 'word', '0x1234', '2025-01-01', '2025-02-01');`);
-    await initializeOptionsCatalog(database, schema, async () => { throw new Error('Do not replace legacy data'); });
-    assert.equal(rows(database).length, 1);
-    const row = rows(database)[0];
+    await initializeOptionsCatalog(database, schema, loadDump);
+    assert.equal(rows(database).length, validateDump(dump) + 1);
+    const row = rows(database).find(row => row.id === 9);
     assert.equal(row.id, 9);
     assert.equal(row.comment, 'Legacy custom option');
     assert.equal(row.value, '0x1234');
