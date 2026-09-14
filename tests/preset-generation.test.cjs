@@ -235,17 +235,26 @@ test(`generation passes the exported preset and optional seed ${JSON.stringify(s
     assert.equal(process.env.ELECTRON_RUN_AS_NODE, '1');
     assert.equal(process.defaultApp, true);
     assert.equal(process.argv[2], '--preset-file');
-    assert.equal(JSON.parse(fs.readFileSync(process.argv[3])).metadata.id, 'test');
+    const path = require('node:path');
+    // Match upstream's loader, which cannot require './D:\\...' when the
+    // preset is staged on a different drive from the randomizer.
+    assert.equal(path.dirname(path.dirname(process.argv[3])), __dirname);
+    const relative = path.relative(__dirname, process.argv[3]);
+    assert.equal(require('./' + relative).metadata.id, 'test');
     assert.equal(process.argv[4], '--out');
+    assert.equal(path.dirname(path.dirname(process.argv[5])), path.join(__dirname, 'output folder'));
     assert.deepEqual(process.argv.slice(6), ${JSON.stringify(seedName?.trim() ? [`--seed=${seedName.trim()}`] : [])});
     fs.writeFileSync(process.argv[5], 'PPF30-test-patch');
   `);
   const store = new BuiltPresetStore();
   const build = await store.resolve(await store.remember(root, 'test'));
-  const output = path.join(root, 'chosen output.ppf');
+  const outputDirectory = path.join(root, 'output folder');
+  await mkdir(outputDirectory);
+  const output = path.join(outputDirectory, 'chosen output.ppf');
   await generatePatch(build, process.execPath, output, seedName);
   assert.equal(await readFile(output, 'utf8'), 'PPF30-test-patch');
   assert.equal((await readdir(root)).some(name => name.startsWith('.sotn-generate-')), false);
+  assert.deepEqual(await readdir(outputDirectory), ['chosen output.ppf']);
   await assert.rejects(generatePatch(build, process.execPath, path.join(root, 'wrong.bin')), /\.ppf output/);
 });
 }
@@ -264,9 +273,12 @@ test('a failing randomizer preserves an existing output and removes its partial 
   `);
   const store = new BuiltPresetStore();
   const build = await store.resolve(await store.remember(root, 'test'));
-  const output = path.join(root, 'existing.ppf');
+  const outputDirectory = path.join(root, 'output folder');
+  await mkdir(outputDirectory);
+  const output = path.join(outputDirectory, 'existing.ppf');
   await writeFile(output, 'existing patch');
   await assert.rejects(generatePatch(build, process.execPath, output));
   assert.equal(await readFile(output, 'utf8'), 'existing patch');
   assert.equal((await readdir(root)).some(name => name.startsWith('.sotn-generate-')), false);
+  assert.deepEqual(await readdir(outputDirectory), ['existing.ppf']);
 });
