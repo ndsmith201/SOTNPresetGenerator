@@ -63,7 +63,7 @@ export async function initializeOptionsCatalog(
           }
           for (const row of bundled) {
             const local = lookup.get(row.id);
-            if (local && columns.every(column => local[column] === row[column])) adopt.run(row.id, row.id);
+            if (local && columns.every(column => column === "read_only" || local[column] === row[column])) adopt.run(row.id, row.id);
           }
         }
         const mappings = new Map(database.prepare("SELECT source_id, option_id FROM bundled_options").all()
@@ -91,6 +91,10 @@ export async function initializeOptionsCatalog(
         database.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'options'").run(nextId);
         database.prepare("INSERT INTO bundled_options_state (id, fingerprint) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET fingerprint = excluded.fingerprint").run(fingerprint);
       }
+      // Bundled definitions are protected even when an older snapshot marked
+      // them editable, or this snapshot was already applied before the upgrade.
+      database.exec(`UPDATE options SET read_only = 1
+        WHERE read_only = 0 AND id IN (SELECT option_id FROM bundled_options)`);
       await migrateOptionsData(database);
       database.exec("COMMIT");
     } catch (error) {

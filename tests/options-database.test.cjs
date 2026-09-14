@@ -49,7 +49,7 @@ test('first installation loads every snapshot field and subsequent launches pres
     source.exec(dump);
     await initializeOptionsCatalog(installed, schema, async () => dump);
     assert.deepEqual(rows(installed), reviewedRows(source));
-    installed.exec("UPDATE options SET comment = 'User edit', read_only = 0 WHERE id = (SELECT MIN(id) FROM options)");
+    installed.exec("UPDATE options SET comment = 'User edit' WHERE id = (SELECT MIN(id) FROM options)");
     installed.exec('DELETE FROM options WHERE id = (SELECT MAX(id) FROM options)');
     const edited = rows(installed);
     await initializeOptionsCatalog(installed, schema, loadDump);
@@ -178,7 +178,7 @@ test('export includes committed WAL data, escaped text, IDs and sequence without
     const sql = readFileSync(destination, 'utf8');
     assert.equal(validateDump(sql), 1);
     await initializeOptionsCatalog(restored, schema, async () => sql);
-    assert.deepEqual(rows(restored), before);
+    assert.deepEqual(rows(restored).map(row => ({ ...row })), before.map(row => ({ ...row, read_only: 1 })));
     assert.deepEqual(rows(source), before);
     assert.equal(restored.prepare('SELECT COUNT(*) AS count FROM write_options').get().count, 0);
     assert.equal(source.prepare('SELECT COUNT(*) AS count FROM write_options').get().count, 1);
