@@ -4,7 +4,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { readFileSync, mkdtempSync, rmSync } = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { initializeOptionsCatalog } = require('../dist/options-database');
+const { initializeOptionsCatalog, deleteUserOption } = require('../dist/options-database');
 const schema = readFileSync(path.join(__dirname, '../database/schema.sql'), 'utf8');
 const dump = readFileSync(path.join(__dirname, '../database/options-dump.sql'), 'utf8');
 const initialize = (db, snapshot = dump) => initializeOptionsCatalog(db, schema, async () => snapshot);
@@ -18,13 +18,36 @@ const update = `${dump}
   INSERT INTO options (id, comment, category, type, value, writes_json)
   VALUES (1000, 'New bundled option', 'items', 'word', '0', '[{"type":"word","value":"1"}]');`;
 
+test('bundled options become read-only on new installs and upgrades while custom options stay editable', async () => {
+  const snapshot = new DatabaseSync(':memory:');
+  try {
+    snapshot.exec(dump);
+    assert.equal(snapshot.prepare('SELECT COUNT(*) AS count FROM options WHERE read_only <> 1').get().count, 0);
+    for (const tracked of [false, true]) {
+      const db = new DatabaseSync(':memory:');
+      try {
+        if (tracked) await initialize(db);
+        else db.exec(dump);
+        // Simulate either an untracked catalog or a previously applied bundle.
+        db.exec('UPDATE options SET read_only = 0');
+        db.exec("INSERT INTO options (id, comment, category, type, value, writes_json) VALUES (1000, 'Custom', 'items', 'word', '7', '[]')");
+        const before = rows(db);
+        await initialize(db);
+        assert.deepEqual(rows(db).map(row => ({ ...row })), before.map(row => ({ ...row, read_only: row.id === 1000 ? 0 : 1 })));
+        assert.throws(() => deleteUserOption(db, 1), /read-only/);
+        assert.doesNotThrow(() => deleteUserOption(db, 1000));
+      } finally { db.close(); }
+    }
+  } finally { snapshot.close(); }
+});
+
 test('upgrading an untracked release refreshes and retires old editable bundled entries', async () => {
   const db = new DatabaseSync(':memory:');
   try {
     db.exec(dump);
-    const [changed, retired] = db.prepare('SELECT id FROM options WHERE read_only = 0 ORDER BY id LIMIT 2').all();
+    const [changed, retired] = db.prepare('SELECT id FROM options ORDER BY id LIMIT 2').all();
     assert.ok(changed && retired);
-    db.prepare("UPDATE options SET comment = 'Old edited bundle content' WHERE id IN (?, ?)").run(changed.id, retired.id);
+    db.prepare("UPDATE options SET read_only = 0, comment = 'Old edited bundle content' WHERE id IN (?, ?)").run(changed.id, retired.id);
     db.exec(`INSERT INTO options (id, comment, category, type, value, writes_json)
       VALUES (1000, 'Keep custom', 'items', 'word', '0', '[]');`);
     const snapshot = `${dump}\nUPDATE options SET comment = 'Replacement bundled entry' WHERE id = ${changed.id};
@@ -50,7 +73,7 @@ test('updates replace bundled rows, restore deletions, retire removed entries an
       INSERT INTO settings VALUES ('local setting');
       DELETE FROM options WHERE id = 3;`);
     const local = db.prepare('SELECT * FROM options WHERE id = 1000').get();
-    const editableId = db.prepare('SELECT id FROM options WHERE read_only = 0 AND id <> 1000 LIMIT 1').get().id;
+    const editableId = db.prepare('SELECT option_id AS id FROM bundled_options LIMIT 1').get().id;
     db.prepare("UPDATE options SET comment = 'Edited bundled option' WHERE id = ?").run(editableId);
     await initialize(db, update);
     assert.equal(db.prepare('SELECT comment FROM options WHERE id = 1').get().comment, 'Updated Bat');
@@ -62,6 +85,7 @@ test('updates replace bundled rows, restore deletions, retire removed entries an
     const mappedId = db.prepare('SELECT option_id FROM bundled_options WHERE source_id = 1000').get().option_id;
     assert.ok(mappedId > 1000);
     assert.equal(db.prepare('SELECT comment FROM options WHERE id = ?').get(mappedId).comment, 'New bundled option');
+    assert.equal(db.prepare('SELECT read_only FROM options WHERE id = ?').get(mappedId).read_only, 1);
     assert.equal(db.prepare('SELECT json FROM saved_presets').get().json, '{"optionIds":["option:1","option:1000"]}');
     assert.equal(db.prepare('SELECT json FROM export_records').get().json, 'saved export');
     assert.equal(db.prepare('SELECT value FROM settings').get().value, 'local setting');
