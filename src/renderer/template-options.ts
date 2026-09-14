@@ -1,5 +1,6 @@
 import type { JsonObject, Preset, PresetOption, TemplateOptionMatch, WriteEntry } from "./types";
 import { detectStartingRelics } from "./starting-relics";
+import { itemInitializationRange } from "./item-initialization";
 
 function record(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -59,15 +60,19 @@ export function matchTemplateOptions(source: JsonObject, options: PresetOption[]
       if (!keys.length || keys.some((key) => generated.includes(key) || !Object.hasOwn(source, key) || !equal(source[key], option.previewJson![key]))) return [];
       return [{ optionId: option.id, writeIndices: [], jsonKeys: keys }];
     }
-    const expected = [...option.injectedWrites, ...option.gameInitWrites, ...option.appendedWrites];
+    const expected = [...option.injectedWrites, ...option.gameInitWrites, ...(option.itemInitWrites ?? []), ...option.appendedWrites];
     if (!expected.length) return [];
+    const itemInit = (option.itemInitWrites?.length ?? 0) > 0;
+    const itemRange = itemInit ? itemInitializationRange(writes) : null;
+    if (itemInit && !itemRange) return [];
     const inStartup = option.injectedWrites.length > 0 || option.gameInitWrites.length > 0;
     if (option.category === "relics" && option.label.startsWith("Enable ") && !relics.has(option.label.slice(7))) return [];
     const relicIndices = option.category === "relics" && option.label.startsWith("Enable ") ? grantWrites.get(option.label.slice(7)) : undefined;
     const expectedLocations = writeLocations(expected);
-    if (!inStartup && expectedLocations[0].address === undefined) return [];
+    if (!inStartup && !itemInit && expectedLocations[0].address === undefined) return [];
     const indices = new Set<number>();
     for (let start = 0; start <= writes.length - expected.length; start++) {
+      if (itemRange && (start <= itemRange.start || start + expected.length > itemRange.end)) continue;
       if (relicIndices && !relicIndices.includes(start)) continue;
       const matches = expected.every((write, offset) => {
         const candidate = writes[start + offset];

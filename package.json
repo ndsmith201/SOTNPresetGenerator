@@ -23,7 +23,6 @@
     "release": "node scripts/release.cjs",
     "options:dump": "node scripts/export-options.cjs",
     "options:check": "node scripts/export-options.cjs --check",
-    "version": "npm run options:dump && git add database/options-dump.sql",
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test tests/*.test.cjs"
   },

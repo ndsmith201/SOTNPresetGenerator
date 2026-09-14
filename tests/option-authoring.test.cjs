@@ -97,15 +97,17 @@ test('clearing an address omits it and invalid addresses identify the offending 
 
 test('placement choices are exclusive and JSON mode excludes write-specific fields', () => {
   const draft = optionDraft(base);
-  for (const placement of ['default', 'game-init', 'after-relics']) {
+  for (const placement of ['default', 'game-init', 'item-init', 'after-relics']) {
     const input = draftInput({ ...draft, placement });
     assert.equal(!!input.gameInit, placement === 'game-init');
+    assert.equal(!!input.itemInit, placement === 'item-init');
     assert.equal(!!input.statEdit, placement === 'after-relics');
+    assert.equal(optionDraft(stored(input)).placement, placement);
   }
   const input = draftInput({ ...draft, rawJson: true, json: '{"enemyDrops":true}' });
   assert.equal(input.rawJson, true);
   assert.deepEqual(input.writes, []);
-  for (const field of ['address', 'primaryWrite', 'additionalWrites', 'gameInit', 'statEdit']) assert.equal(input[field], undefined);
+  for (const field of ['address', 'primaryWrite', 'additionalWrites', 'gameInit', 'itemInit', 'statEdit']) assert.equal(input[field], undefined);
   assert.throws(() => draftInput({ ...draft, rawJson: true, json: '[]' }), /must be an object/);
   assert.throws(() => draftInput({ ...draft, rawJson: true, json: '{' }), /valid JSON/);
 });
@@ -120,14 +122,14 @@ test('older catalogs migrate all writes without changing existing data and prese
     assert.equal(db.prepare('PRAGMA table_info(options)').all().some(column => column.name === 'writes_json'), false);
     const before = db.prepare('SELECT comment, value, address, additional_writes_json FROM options').all();
     const schema = fs.readFileSync('database/schema.sql', 'utf8');
-    await initializeOptionsCatalog(db, schema, async () => { throw new Error('Do not reload existing catalog'); });
+    await initializeOptionsCatalog(db, schema, async () => legacyCatalog.replace(/INSERT INTO options[\s\S]*$/, ''));
     assert.deepEqual(db.prepare('SELECT comment, value, address, additional_writes_json FROM options').all(), before);
     assert.equal(db.prepare('SELECT primary_write_json FROM options LIMIT 1').get().primary_write_json, null);
     const migrated = JSON.parse(db.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json);
     assert.equal(migrated[0].value, before[0].value);
     const write = { type: 'word', value: 12, address: '0x1000', comment: 'Row note', custom: true };
     db.prepare('UPDATE options SET writes_json = ? WHERE id = 1').run(JSON.stringify([write, ...migrated]));
-    await initializeOptionsCatalog(db, schema, async () => '');
+    await initializeOptionsCatalog(db, schema, async () => legacyCatalog.replace(/INSERT INTO options[\s\S]*$/, ''));
     assert.deepEqual(JSON.parse(db.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json), [write, ...migrated]);
   } finally { db.close(); }
 });
@@ -147,7 +149,7 @@ for (const existingWritesColumn of [false, true]) test(`migration retains indepe
     const next = { type: 'short', value: '1', address: '0x1234', comment: 'Next note' };
     db.prepare('UPDATE options SET primary_write_json = ?, additional_writes_json = ? WHERE id = 1').run(JSON.stringify(primary), JSON.stringify([next]));
     const schema = fs.readFileSync('database/schema.sql', 'utf8');
-    await initializeOptionsCatalog(db, schema, async () => { throw new Error('No snapshot reload'); });
+    await initializeOptionsCatalog(db, schema, async () => legacyCatalog.replace(/INSERT INTO options[\s\S]*$/, ''));
     const writes = JSON.parse(db.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json);
     assert.deepEqual(writes, [primary, next]);
     const option = { ...base, writes };
@@ -155,7 +157,7 @@ for (const existingWritesColumn of [false, true]) test(`migration retains indepe
     assert.deepEqual(toPresetOptions([option])[0].injectedWrites, [primary, next]);
     await initializeOptionsCatalog(restored, schema, async () => legacyCatalog);
     restored.prepare('UPDATE options SET writes_json = ? WHERE id = 1').run(JSON.stringify(writes));
-    await initializeOptionsCatalog(restored, schema, async () => { throw new Error('No reload'); });
+    await initializeOptionsCatalog(restored, schema, async () => legacyCatalog);
     assert.deepEqual(JSON.parse(restored.prepare('SELECT writes_json FROM options WHERE id = 1').get().writes_json), [primary, next]);
   } finally { db.close(); restored.close(); }
 });

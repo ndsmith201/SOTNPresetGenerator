@@ -17,6 +17,7 @@ const runtimeFiles = new Set([
   '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js', '/dist/bundled-randomizer.js', '/dist/preset-generation.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
   '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
+  '/database/bundled-options-baseline.json',
   '/database/migrations/001-built-in-option-descriptions.sql',
   '/assets/icons/castle-moon.ico'
 ]);
@@ -63,10 +64,8 @@ module.exports = {
   }],
   hooks: {
     prePackage: async () => {
-      // Hosted runners use the release tag's committed snapshot. Local packaging
-      // must read the author's live database and fail if it is unavailable.
-      const args = process.env.CI ? ['--check'] : [];
-      const { stdout } = await execFileAsync(process.execPath, [path.join(__dirname, 'scripts/export-options.cjs'), ...args], {
+      // Refresh explicitly with npm run options:dump; packaging only validates.
+      const { stdout } = await execFileAsync(process.execPath, [path.join(__dirname, 'scripts/export-options.cjs'), '--check'], {
         cwd: __dirname, windowsHide: true, maxBuffer: 10 * 1024 * 1024
       });
       console.log(stdout.trim());

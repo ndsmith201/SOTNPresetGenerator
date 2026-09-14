@@ -9,6 +9,8 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const { BuiltPresetStore, generatePatch, normalizeSeedName } = require('../dist/preset-generation');
 const { exportMatchesCurrent } = require('../dist/renderer/export-state');
 const { TopBar } = require('../dist/renderer/components/TopBar');
+const { sortPresetOptions } = require('../dist/renderer/option-catalog');
+const { buildPreviewPreset, createPresetFromTemplate, loadPresets, persistPresets, toPresetOptions } = require('../dist/renderer/preset-utils');
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'sotn-generation-'));
@@ -50,6 +52,66 @@ test('a successful export and its generation token survive closing and reopening
     assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, 'another directory', snapshot.json), false);
     assert.equal((await after.resolve(token)).presetId, 'test');
   } finally { fixture.close(); }
+});
+
+test('exporting after an option save stays current across catalog, draft, and database restart', async (t) => {
+  const fixture = await persistentFixture(t);
+  const storage = new Map();
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: key => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value)
+  } });
+  try {
+    const rows = [
+      { id: 1, comment: 'Z gameplay patch', category: 'gameplay', writes: [{ type: 'word', address: '0x1000', value: '0x01' }] },
+      { id: 2, comment: 'A world patch', category: 'world', writes: [{ type: 'word', address: '0x2000', value: '0x02' }] }
+    ];
+    const savedOption = toPresetOptions([rows[1]])[0];
+    const afterSave = sortPresetOptions([...toPresetOptions([rows[0]]), savedOption]);
+    const template = { writes: [{ type: 'word', address: '0x00158c98', value: '0x37f70000' },
+      { type: 'word', value: '0x36ff0000' }, { type: 'word', value: '0x0803924f' }, { type: 'word', value: '0x00000000' }] };
+    const draft = createPresetFromTemplate('Test');
+    draft.optionIds = afterSave.map(option => option.id);
+    const json = JSON.stringify(buildPreviewPreset(template, draft, afterSave));
+    // The previous name-only save order generated a different write sequence.
+    assert.notEqual(json, JSON.stringify(buildPreviewPreset(template, draft, [...afterSave].sort((a, b) => a.label.localeCompare(b.label)))));
+    persistPresets([draft]);
+    await writeFile(path.join(fixture.root, 'presets/test.json'), json);
+    const token = await fixture.restart().remember(fixture.root, 'test', { localPresetId: draft.id, json });
+
+    const restartedOptions = sortPresetOptions(toPresetOptions([...rows].reverse()));
+    const [restoredDraft] = loadPresets(new Set(restartedOptions.map(option => option.id)));
+    const restartedStore = fixture.restart();
+    const exported = (await restartedStore.listSuccessfulExports())[JSON.stringify([fixture.root, 'test'])];
+    const current = JSON.stringify(buildPreviewPreset(template, restoredDraft, restartedOptions));
+    assert.equal(exportMatchesCurrent(exported, restoredDraft.id, fixture.root, current), true);
+    assert.equal((await restartedStore.resolve(token)).presetId, 'test');
+
+    const edited = sortPresetOptions(toPresetOptions([rows[0], { ...rows[1], writes: [{ type: 'word', address: '0x2000', value: '0x03' }] }]));
+    assert.equal(exportMatchesCurrent(exported, restoredDraft.id, fixture.root, JSON.stringify(buildPreviewPreset(template, restoredDraft, edited))), false);
+    restoredDraft.optionIds = [afterSave[0].id];
+    persistPresets([restoredDraft]);
+    const [changedDraft] = loadPresets();
+    const afterAnotherRestart = (await fixture.restart().listSuccessfulExports())[JSON.stringify([fixture.root, 'test'])];
+    assert.equal(exportMatchesCurrent(afterAnotherRestart, changedDraft.id, fixture.root, JSON.stringify(buildPreviewPreset(template, changedDraft, restartedOptions))), false);
+  } finally {
+    fixture.close();
+    if (previousStorage) Object.defineProperty(globalThis, 'localStorage', previousStorage);
+    else delete globalThis.localStorage;
+  }
+});
+
+test('catalog ordering is deterministic for renamed options and duplicate names', () => {
+  const rows = toPresetOptions([
+    { id: 3, comment: 'same', category: 'world', writes: [] },
+    { id: 2, comment: 'same', category: 'world', writes: [] },
+    { id: 1, comment: 'Z', category: 'gameplay', writes: [] }
+  ]);
+  const original = structuredClone(rows);
+  assert.deepEqual(sortPresetOptions(rows).map(option => option.source.id), [1, 2, 3]);
+  assert.deepEqual(rows, original);
+  assert.deepEqual(sortPresetOptions([rows[0], { ...rows[1], label: 'z' }, rows[2]]).map(option => option.source.id), [1, 3, 2]);
 });
 
 test('a failed re-export stays invalid after restart even when the previous files remain', async (t) => {

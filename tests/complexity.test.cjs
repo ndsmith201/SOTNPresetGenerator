@@ -17,6 +17,26 @@ test("a pair counts only its completing pickup, even if it unlocks several check
   assert.equal(calculateMaxComplexity(input, selected("Gold ring", "Silver ring")), 0);
 });
 
+test("starting equipment lowers the complexity bound and deselection restores it", () => {
+  const options = ["Gold Ring", "Silver Ring", "Holy Glasses"].map(name => ({
+    ...option(name, "items"), label: `Start with ${name}`
+  }));
+  const input = locks(check("Gold ring", "Gold ring"), check("Silver ring", "Silver ring"),
+    check("Trio", "Holy glasses"));
+  assert.equal(calculateMaxComplexity(input), 3);
+  for (const startingItem of options) assert.equal(calculateMaxComplexity(input, [startingItem]), 2);
+  assert.equal(calculateMaxComplexity(input, options), 0);
+  const preset = { id: "equipment", name: "Equipment", optionIds: options.map(item => item.id),
+    complexity: 3, metaExtension: "Guarded", builtInSettings: DEFAULT_BUILT_IN_SETTINGS,
+    createdAt: "", updatedAt: "" };
+  const unlocked = buildPreviewPreset(input, preset, options);
+  assert.equal(unlocked.metadata.metaComplexity, "0");
+  assert.equal(unlocked.complexityGoal.min, 0);
+  const restored = buildPreviewPreset(input, { ...preset, optionIds: [] }, options);
+  assert.equal(restored.metadata.metaComplexity, "3");
+  assert.equal(restored.complexityGoal.min, 3);
+});
+
 test("maximum searches acquisition orders and counts only new access", () => {
   // Taking A first opens everything in one step; B then C opens two steps.
   const input = locks(check("Cube of Zoe", "A", "B"), check("Trio", "A", "C"));

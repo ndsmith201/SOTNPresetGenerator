@@ -69,9 +69,9 @@ test("regular option writes precede the return and nop without redirecting the r
   const originalOptions = structuredClone(options);
   const result = preview(template, options);
   assert.deepEqual(result.writes.slice(-2), [
-    { ...template.writes.at(-2), address: "0x00158cb0" }, template.writes.at(-1)
+    { ...template.writes.at(-2), address: "0x00158cb8" }, template.writes.at(-1)
   ]);
-  assert.deepEqual(result.writes.slice(3, -2).map((write) => write.comment), [
+  assert.deepEqual(result.writes.slice(template.writes.findIndex(write => Number(write.value) === 0x3c038004), -2).map((write) => write.comment), [
     "Relic", "Stat", "lui v1, 0x8004", "Init", "Patch", "Patch follow-up"
   ]);
   assert.deepEqual(template, original);
@@ -122,6 +122,45 @@ test("a fully satisfied alternative unlocks the location", () => {
     { location: "Gravity Boots", locks: [] }
   ] }, [option("bat", "Enable Soul of Bat")]);
   assert.deepEqual(result.lockLocation.map((entry) => entry.locks), [[], [], []]);
+});
+
+test("starting equipment options remove their exact lock requirements and deselection restores them", () => {
+  const equipment = [
+    ["Start with Gold Ring", "Gold ring"],
+    ["Start with Silver Ring", "Silver ring"],
+    ["Start with Holy Glasses", "Holy glasses"]
+  ];
+  for (const [label, requirement] of equipment) {
+    const options = [option(label, label, { category: "items" })];
+    const template = { lockLocation: [
+      { location: "Cube of Zoe", locks: [`${requirement} + Jewel of Open`] },
+      { location: "Spirit Orb", locks: [requirement, "Soul of Bat"] },
+      { location: "Gravity Boots", locks: [`${requirement} Extra`] }
+    ] };
+    const original = structuredClone(template);
+    assert.deepEqual(preview(template, options).lockLocation.map(entry => entry.locks), [
+      ["Jewel of Open"], [], [`${requirement} Extra`]
+    ], label);
+    assert.deepEqual(preview(template, options, []).lockLocation, original.lockLocation, label);
+    assert.deepEqual(template, original);
+  }
+});
+
+test("starting rings and glasses combine with selected relics to unlock locations", () => {
+  const options = [
+    option("gold", "Start with Gold Ring", { category: "items" }),
+    option("silver", "Start with Silver Ring", { category: "items" }),
+    option("glasses", "Start with Holy Glasses", { category: "items" }),
+    option("jewel", "Enable Jewel of Open")
+  ];
+  const template = { lockLocation: [
+    { location: "Holy glasses", locks: ["Gold ring + Silver ring"] },
+    { location: "Trio", locks: ["Holy glasses + Jewel of Open"] }
+  ] };
+  assert.deepEqual(preview(template, options, ["gold"]).lockLocation.map(entry => entry.locks), [
+    ["Silver ring"], ["Holy glasses + Jewel of Open"]
+  ]);
+  assert.deepEqual(preview(template, options).lockLocation.map(entry => entry.locks), [[], []]);
 });
 
 test("requirement removal keeps only one copy of identical locks within each location", () => {

@@ -1137,6 +1137,16 @@
     },
     {
       "address": "0x00158c98",
+      "comment": "Save Return Address for rA (Armor Code)",
+      "type": "word",
+      "value": "0x37F70000"
+    },
+    {
+      "comment": "Recall Return Address for rA (Armor Code)",
+      "type": "word",
+      "value": "0x36FF0000"
+    },
+    {
       "type": "word",
       "value": "0x34020003",
       "comment": "ori v0, 0x0003"

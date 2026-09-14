@@ -14,7 +14,6 @@ function release(args, {
 
   const options = { cwd: path.resolve(__dirname, '..'), stdio: 'inherit', windowsHide: true };
   // Use npm's CLI through Node so this also works with Windows npm.cmd launchers.
-  // The existing version hook exports and stages the options snapshot.
   run(process.execPath, [npmPath, 'version', args[0], '--git-tag-version=true', '--tag-version-prefix=v'], options);
   const tag = `v${readVersion()}`;
   try {

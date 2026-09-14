@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS options (
   value TEXT NOT NULL CHECK (length(trim(value)) > 0),
   address TEXT CHECK (address IS NULL OR length(trim(address)) > 0),
   game_init INTEGER NOT NULL DEFAULT 0 CHECK (game_init IN (0, 1)),
+  item_init INTEGER NOT NULL DEFAULT 0 CHECK (item_init IN (0, 1)),
   stat_edit INTEGER NOT NULL DEFAULT 0 CHECK (stat_edit IN (0, 1)),
   raw_json INTEGER NOT NULL DEFAULT 0 CHECK (raw_json IN (0, 1)),
   primary_write_json TEXT CHECK (primary_write_json IS NULL OR (json_valid(primary_write_json) AND json_type(primary_write_json) = 'object')),

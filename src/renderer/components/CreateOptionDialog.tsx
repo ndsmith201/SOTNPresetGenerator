@@ -16,7 +16,7 @@ interface CreateOptionDialogProps {
 }
 
 const placementLabels: Record<WritePlacement, string> = {
-  default: "Default placement", "game-init": "Game initialization", "after-relics": "After relic writes"
+  default: "Default placement", "game-init": "Game initialization", "item-init": "Item initialization", "after-relics": "After relic writes"
 };
 const starts = [
   { id: "copy", icon: "copy", title: "Copy an existing option", help: "Use a working option as your starting point." },
@@ -176,7 +176,7 @@ export function CreateOptionDialog({ open, option, options, inline = false, onCl
                   </div>)}
                 </div>
                 {!readOnly && <button className="button button-ghost builder-add-write" type="button" disabled={advancedSource !== null} onClick={() => { change({ writes: [...draft.writes, { type: "word", value: "" }] }); setRowAnnouncement(`Write ${draft.writes.length + 1} added.`); }}>+ Add write</button>}
-                <div className="dialog-field builder-placement"><label htmlFor="optionPlacementSelect">Write placement</label><select id="optionPlacementSelect" disabled={readOnly} value={draft.placement} onChange={event => change({ placement: event.target.value as WritePlacement })}>{Object.entries(placementLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="builder-help">{draft.placement === "game-init" ? "Insert after the template’s “lui v1, 0x8004” initialization anchor." : draft.placement === "after-relics" ? "Place injected writes after relic-option writes. Use this order for starting-stat changes." : "Use the template’s normal assembly rules for this category and its addresses."}</p></div>
+                <div className="dialog-field builder-placement"><label htmlFor="optionPlacementSelect">Write placement</label><select id="optionPlacementSelect" disabled={readOnly} value={draft.placement} onChange={event => change({ placement: event.target.value as WritePlacement })}>{Object.entries(placementLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="builder-help">{draft.placement === "item-init" ? "Insert between the Save Return Address and Recall Return Address armor-code anchors." : draft.placement === "game-init" ? "Insert after the template’s “lui v1, 0x8004” initialization anchor." : draft.placement === "after-relics" ? "Place injected writes after relic-option writes. Use this order for starting-stat changes." : "Use the template’s normal assembly rules for this category and its addresses."}</p></div>
                 <details className="builder-advanced"><summary>Advanced JSON</summary><p className="builder-help">Edit the complete write sequence. Extra properties are preserved when editing rows.</p><textarea aria-label="Complete write sequence JSON" readOnly={readOnly} rows={8} spellCheck={false} value={advancedSource ?? JSON.stringify(draft.writes, null, 2)} onChange={event => setAdvancedSource(event.target.value)} />{advancedSource !== null && <div className="dialog-actions"><button type="button" className="button button-ghost" onClick={() => { setAdvancedSource(null); setError(""); }}>Discard JSON edits</button><button type="button" className="button button-primary" onClick={applyJson}>Apply JSON</button></div>}</details>
               </>}
             </fieldset>

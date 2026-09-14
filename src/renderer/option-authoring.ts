@@ -2,7 +2,7 @@ import { WRITE_TYPES } from "./constants";
 import { optionWrites } from "../option-writes";
 import type { CreateOptionInput, DatabaseOption, OptionCategory, WriteEntry, WriteType } from "./types";
 
-export type WritePlacement = "default" | "game-init" | "after-relics";
+export type WritePlacement = "default" | "game-init" | "item-init" | "after-relics";
 export interface OptionDraft {
   comment: string;
   description: string;
@@ -18,7 +18,7 @@ export function optionDraft(option?: DatabaseOption | null): OptionDraft {
     comment: option?.comment ?? "", description: option?.description ?? "",
     category: option?.category ?? "world", rawJson: option?.rawJson ?? false,
     json: option?.rawJson ? option.value ?? "{}" : '{\n  "enemyDrops": true\n}',
-    placement: option?.gameInit ? "game-init" : option?.statEdit ? "after-relics" : "default",
+    placement: option?.itemInit ? "item-init" : option?.gameInit ? "game-init" : option?.statEdit ? "after-relics" : "default",
     writes: option && !option.rawJson ? optionWrites(option) : [{ type: "word", value: "" }]
   };
 }
@@ -73,6 +73,6 @@ export function draftInput(draft: OptionDraft): CreateOptionInput {
   }
   return {
     ...common, writes: normalizeWrites(draft.writes),
-    ...(draft.placement === "game-init" ? { gameInit: true } : draft.placement === "after-relics" ? { statEdit: true } : {})
+    ...(draft.placement === "item-init" ? { itemInit: true } : draft.placement === "game-init" ? { gameInit: true } : draft.placement === "after-relics" ? { statEdit: true } : {})
   };
 }
