@@ -117,8 +117,12 @@ export async function generatePatch(build: BuiltPreset, executablePath: string, 
   const seed = normalizeSeedName(seedName);
   if (path.extname(outputPath).toLowerCase() !== ".ppf") throw new Error("Choose a .ppf output file.");
   const temporary = await mkdtemp(path.join(path.dirname(outputPath), ".sotn-generate-"));
+  let presetTemporary: string | undefined;
   try {
-    const presetFile = path.join(temporary, "preset.json");
+    // Upstream loads presets with require('./' + path.relative(...)). Keep
+    // the snapshot on its drive so a Windows output drive cannot produce './D:\...'.
+    presetTemporary = await mkdtemp(path.join(build.rootPath, ".sotn-generate-"));
+    const presetFile = path.join(presetTemporary, "preset.json");
     await copyFile(path.join(build.rootPath, "presets", `${build.presetId}.json`), presetFile);
     if (await hashFile(presetFile) !== build.jsonHash) throw new Error(exportFirst);
     const patchFile = path.join(temporary, "patch.ppf");
@@ -138,6 +142,9 @@ export async function generatePatch(build: BuiltPreset, executablePath: string, 
     // Keep the previous output intact if generation fails or times out.
     await rename(patchFile, outputPath);
   } finally {
-    await rm(temporary, { recursive: true, force: true });
+    await Promise.all([
+      rm(temporary, { recursive: true, force: true }),
+      ...(presetTemporary ? [rm(presetTemporary, { recursive: true, force: true })] : [])
+    ]);
   }
 }
