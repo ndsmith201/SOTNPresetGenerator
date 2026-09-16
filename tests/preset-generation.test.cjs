@@ -258,13 +258,11 @@ test(`generation passes the exported preset and optional seed ${JSON.stringify(s
     const assert = require('node:assert/strict');
     assert.equal(process.env.ELECTRON_RUN_AS_NODE, '1');
     assert.equal(process.defaultApp, true);
-    assert.equal(process.argv[2], '--preset-file');
+    assert.equal(process.argv[2], '--preset');
+    assert.equal(process.argv[3], 'test');
     const path = require('node:path');
-    // Match upstream's loader, which cannot require './D:\\...' when the
-    // preset is staged on a different drive from the randomizer.
-    assert.equal(path.dirname(path.dirname(process.argv[3])), __dirname);
-    const relative = path.relative(__dirname, process.argv[3]);
-    assert.equal(require('./' + relative).metadata.id, 'test');
+    assert.equal(process.cwd(), __dirname);
+    assert.equal(fs.existsSync(path.join(__dirname, 'build', 'presets', process.argv[3] + '.js')), true);
     assert.equal(process.argv[4], '--out');
     assert.equal(path.dirname(path.dirname(process.argv[5])), path.join(__dirname, 'output folder'));
     assert.deepEqual(process.argv.slice(6), ${JSON.stringify(seedName?.trim() ? [`--seed=${seedName.trim()}`] : [])});
@@ -288,6 +286,28 @@ test('invalid seed names are rejected at the generation boundary', () => {
     assert.throws(() => normalizeSeedName(value), /valid seed name/);
   }
 });
+
+for (const modifiedFile of ['presets/test.json', 'build/presets/test.js']) {
+  for (const timing of ['before', 'during']) {
+    test(`generation preserves the previous patch when ${modifiedFile} changes ${timing} generation`, async t => {
+      const root = await fixture(t);
+      const store = new BuiltPresetStore();
+      const build = await store.resolve(await store.remember(root, 'test'));
+      const changedPath = path.join(root, modifiedFile);
+      await writeFile(path.join(root, 'randomize'), `
+        const fs = require('node:fs');
+        fs.writeFileSync(process.argv[5], 'unverified patch');
+        ${timing === 'during' ? `fs.writeFileSync(${JSON.stringify(changedPath)}, 'changed externally');` : ''}
+      `);
+      if (timing === 'before') await writeFile(changedPath, 'changed externally');
+      const output = path.join(root, 'existing.ppf');
+      await writeFile(output, 'existing patch');
+      await assert.rejects(generatePatch(build, process.execPath, output), /Export and build/);
+      assert.equal(await readFile(output, 'utf8'), 'existing patch');
+      assert.equal((await readdir(root)).some(name => name.startsWith('.sotn-generate-')), false);
+    });
+  }
+}
 
 test('a failing randomizer preserves an existing output and removes its partial patch', async (t) => {
   const root = await fixture(t);

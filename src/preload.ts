@@ -17,7 +17,8 @@ export interface PresetAppApi {
   createOption: (request: CreateOptionInput) => Promise<unknown>;
   updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
-  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
+  chooseRandoToolsPath: (currentPath?: string) => Promise<unknown>;
+  exportPreset: (request: { sotnRandoPath: string; randoToolsPath?: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
   getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;
   generatePreset: (buildToken: string, seedName?: string) => Promise<unknown>;
   windowControls: {
@@ -50,6 +51,7 @@ const api: PresetAppApi = {
   createOption: (request) => ipcRenderer.invoke("options:create", request) as Promise<unknown>,
   updateOption: (id, request) => ipcRenderer.invoke("options:update", id, request) as Promise<unknown>,
   chooseSotnRandoPath: (currentPath) => ipcRenderer.invoke("sotnrando:choose-path", currentPath) as Promise<unknown>,
+  chooseRandoToolsPath: (currentPath) => ipcRenderer.invoke("randotools:choose-path", currentPath) as Promise<unknown>,
   exportPreset: (request) => ipcRenderer.invoke("preset:export", request) as Promise<unknown>,
   getSuccessfulExports: () => ipcRenderer.invoke("preset:successful-exports") as Promise<Record<string, SuccessfulExport>>,
   generatePreset: (buildToken, seedName) => ipcRenderer.invoke("preset:generate", buildToken, seedName) as Promise<unknown>,

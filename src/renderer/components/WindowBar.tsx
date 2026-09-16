@@ -5,6 +5,7 @@ interface WindowBarProps {
   onCommunity: () => void;
   editing: boolean;
   exportPath: string;
+  randoToolsPath: string;
   author: string;
   onEditAuthor: () => void;
   onDeletePreset: () => void;
@@ -12,6 +13,7 @@ interface WindowBarProps {
   onSavePreset: () => void;
   onShowLibrary: () => void;
   onChooseExportPath: () => void;
+  onChooseRandoToolsPath: () => void;
 }
 
 export function WindowBar(props: WindowBarProps) {
@@ -55,6 +57,10 @@ export function WindowBar(props: WindowBarProps) {
           <div className="menu-popover settings-menu" role="menu" hidden={openMenu !== "settings"}>
             <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onChooseExportPath)}>
               <span className="path-menu-copy"><strong>Export directory</strong><small title={props.exportPath}>{props.exportPath || "Not selected"}</small></span>
+              <Icon name="folder" />
+            </button>
+            <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onChooseRandoToolsPath)}>
+              <span className="path-menu-copy"><strong>RandoTools Directory</strong><small title={props.randoToolsPath}>{props.randoToolsPath || "Not selected"}</small></span>
               <Icon name="folder" />
             </button>
             <button className="path-menu-item" type="button" role="menuitem" onClick={() => act(props.onEditAuthor)}>
