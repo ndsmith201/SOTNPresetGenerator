@@ -13,6 +13,7 @@ const dump = readFileSync(path.join(__dirname, '../database/options-dump.sql'), 
 const rows = database => database.prepare('SELECT * FROM options ORDER BY id').all().map(row => {
   // Account for defaulted/backfilled columns when comparing legacy snapshots.
   row.item_init ??= 0;
+  row.main_block ??= 0;
   row.writes_json ??= JSON.stringify(optionWrites({ ...row, rawJson: !!row.raw_json,
     primaryWrite: JSON.parse(row.primary_write_json || 'null'), additionalWrites: JSON.parse(row.additional_writes_json || '[]') }));
   return row;

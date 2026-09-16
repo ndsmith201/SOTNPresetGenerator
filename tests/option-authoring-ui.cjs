@@ -110,6 +110,7 @@ async function main() {
     await fill('#optionModeSelect', 'json');
     await fill('#optionJsonInput', '{"enemyDrops":false}');
     await fill('#optionModeSelect', 'write');
+    await fill('#optionPlacementSelect', 'main-block');
     assert.equal(await evaluate(`document.querySelectorAll('.builder-write-address input').length`), 5);
     assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field(1, 'address (optional)'))}).value`), '0x00123456');
     await click('.builder-enable input');
@@ -119,6 +120,8 @@ async function main() {
     await button('Create option');
     await waitFor(`!document.querySelector('.option-builder[open]')`);
     const input = await evaluate('window.__calls.at(-1).input');
+    assert.equal(input.mainBlock, true);
+    assert.equal(input.statEdit, undefined);
     assert.equal(input.writes[0].address, '0x00123456');
     assert.equal(input.writes[0].comment, 'My addressed write');
     assert.deepEqual(input.writes[0].custom, { retained: true });
@@ -130,6 +133,7 @@ async function main() {
     // Reopen an editable copy and verify saving an address removal.
     await click('[aria-label="Actions for My stat boost"]'); await button('Edit');
     await waitFor(`Boolean(document.querySelector('.option-builder[open]'))`);
+    assert.equal(await evaluate(`document.querySelector('#optionPlacementSelect').value`), 'main-block');
     assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field(1, 'address (optional)'))}).value`), '0x00123456');
     await fill(field(1, 'address (optional)'), '');
     await button('Save changes'); await waitFor(`!document.querySelector('.option-builder[open]')`);

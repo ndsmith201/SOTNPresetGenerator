@@ -33,7 +33,7 @@ test('bundled options become read-only on new installs and upgrades while custom
         db.exec("INSERT INTO options (id, comment, category, type, value, writes_json) VALUES (1000, 'Custom', 'items', 'word', '7', '[]')");
         const before = rows(db);
         await initialize(db);
-        assert.deepEqual(rows(db).map(row => ({ ...row })), before.map(row => ({ ...row, read_only: row.id === 1000 ? 0 : 1 })));
+        assert.deepEqual(rows(db).map(row => ({ ...row })), before.map(row => ({ main_block: 0, ...row, read_only: row.id === 1000 ? 0 : 1 })));
         assert.throws(() => deleteUserOption(db, 1), /read-only/);
         assert.doesNotThrow(() => deleteUserOption(db, 1000));
       } finally { db.close(); }

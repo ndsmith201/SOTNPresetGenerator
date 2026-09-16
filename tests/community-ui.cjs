@@ -11,6 +11,7 @@ async function main() {
   app.setPath('userData', path.join(root, 'profile'));
   await app.whenReady();
   const template = JSON.parse(await fs.readFile(path.join(__dirname, '../templates/preset-template.json'), 'utf8'));
+  template.writes.push({ type: 'word', value: '0x00000000', comment: 'Disabled template option (nop)' });
   const preload = path.join(root, 'preload.cjs');
   await fs.writeFile(preload, `
     const template = ${JSON.stringify(template)};
@@ -173,6 +174,7 @@ async function main() {
     await fill('#sharePresetDescription', '  Explore the castle with shortcuts.\nA relaxed first run.  ');
     assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).metadata.description`), 'Explore the castle with shortcuts.\nA relaxed first run.');
     assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).metadata.author.at(-1)`), 'runner');
+    assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).writes.some(write => write.comment === 'Disabled template option (nop)')`), false);
     await screenshot('community-share.png');
     await evaluate('window.__failNextShare = true');
     await button('Share publicly');

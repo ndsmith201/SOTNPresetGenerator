@@ -47,6 +47,12 @@ export function writeLocations(writes: WriteEntry[]): { address: number | undefi
   });
 }
 
+export function mainBlockStart(writes: WriteEntry[]): number | null {
+  const index = writes.findIndex((write, index) => write.type === "word" && Number(write.value) === 0x0803924f &&
+    writes[index + 1]?.type === "word" && Number(writes[index + 1].value) === 0);
+  return index < 0 ? null : index + 2;
+}
+
 export function matchTemplateOptions(source: JsonObject, options: PresetOption[]): TemplateOptionMatch[] {
   const writes = Array.isArray(source.writes) ? source.writes.map((write) => record(write) ? write : {}) : [];
   const locations = writeLocations(writes);
@@ -60,18 +66,21 @@ export function matchTemplateOptions(source: JsonObject, options: PresetOption[]
       if (!keys.length || keys.some((key) => generated.includes(key) || !Object.hasOwn(source, key) || !equal(source[key], option.previewJson![key]))) return [];
       return [{ optionId: option.id, writeIndices: [], jsonKeys: keys }];
     }
-    const expected = [...option.injectedWrites, ...option.gameInitWrites, ...(option.itemInitWrites ?? []), ...option.appendedWrites];
+    const expected = [...option.injectedWrites, ...option.gameInitWrites, ...(option.itemInitWrites ?? []), ...(option.mainBlockWrites ?? []), ...option.appendedWrites];
     if (!expected.length) return [];
     const itemInit = (option.itemInitWrites?.length ?? 0) > 0;
     const itemRange = itemInit ? itemInitializationRange(writes) : null;
     if (itemInit && !itemRange) return [];
+    const mainBlock = (option.mainBlockWrites?.length ?? 0) > 0;
+    const mainStart = mainBlock ? mainBlockStart(writes) : null;
     const inStartup = option.injectedWrites.length > 0 || option.gameInitWrites.length > 0;
     if (option.category === "relics" && option.label.startsWith("Enable ") && !relics.has(option.label.slice(7))) return [];
     const relicIndices = option.category === "relics" && option.label.startsWith("Enable ") ? grantWrites.get(option.label.slice(7)) : undefined;
     const expectedLocations = writeLocations(expected);
-    if (!inStartup && !itemInit && expectedLocations[0].address === undefined) return [];
+    if (!inStartup && !itemInit && mainStart === null && expectedLocations[0].address === undefined) return [];
     const indices = new Set<number>();
     for (let start = 0; start <= writes.length - expected.length; start++) {
+      if (mainStart !== null && start < mainStart) continue;
       if (itemRange && (start <= itemRange.start || start + expected.length > itemRange.end)) continue;
       if (relicIndices && !relicIndices.includes(start)) continue;
       const matches = expected.every((write, offset) => {

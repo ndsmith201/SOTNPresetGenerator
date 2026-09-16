@@ -97,10 +97,11 @@ test('clearing an address omits it and invalid addresses identify the offending 
 
 test('placement choices are exclusive and JSON mode excludes write-specific fields', () => {
   const draft = optionDraft(base);
-  for (const placement of ['default', 'game-init', 'item-init', 'after-relics']) {
+  for (const placement of ['default', 'game-init', 'item-init', 'after-relics', 'main-block']) {
     const input = draftInput({ ...draft, placement });
     assert.equal(!!input.gameInit, placement === 'game-init');
     assert.equal(!!input.itemInit, placement === 'item-init');
+    assert.equal(!!input.mainBlock, placement === 'main-block');
     assert.equal(!!input.statEdit, placement === 'after-relics');
     assert.equal(optionDraft(stored(input)).placement, placement);
   }

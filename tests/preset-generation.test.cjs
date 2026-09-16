@@ -7,6 +7,7 @@ const { DatabaseSync } = require('node:sqlite');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { BuiltPresetStore, generatePatch, normalizeSeedName } = require('../dist/preset-generation');
+const { presetSubmission } = require('../dist/community-presets');
 const { exportMatchesCurrent } = require('../dist/renderer/export-state');
 const { TopBar } = require('../dist/renderer/components/TopBar');
 const { sortPresetOptions } = require('../dist/renderer/option-catalog');
@@ -51,6 +52,29 @@ test('a successful export and its generation token survive closing and reopening
     assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, fixture.root, '{"music":true}'), false);
     assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, 'another directory', snapshot.json), false);
     assert.equal((await after.resolve(token)).presetId, 'test');
+  } finally { fixture.close(); }
+});
+
+test('cleaned exports retain the draft snapshot and a valid generation token across restart', async (t) => {
+  const fixture = await persistentFixture(t);
+  try {
+    const preset = { metadata: { id: 'test' }, writes: [
+      { type: 'word', address: '0x00158c98', value: '0x00000000', comment: 'Disabled template option (nop)' },
+      { type: 'word', value: '0x0803924f', comment: 'j 0x800e493c' },
+      { type: 'word', value: '0x00000000', comment: 'nop' }
+    ] };
+    const snapshot = { localPresetId: 'saved-draft', json: JSON.stringify(preset) };
+    const exportedPath = path.join(fixture.root, 'presets/test.json');
+    await writeFile(exportedPath, `${JSON.stringify(presetSubmission(preset), null, 2)}\n`);
+    const token = await fixture.restart().remember(fixture.root, 'test', snapshot);
+    const restarted = fixture.restart();
+    const restored = (await restarted.listSuccessfulExports())[JSON.stringify([fixture.root, 'test'])];
+    assert.equal(exportMatchesCurrent(restored, snapshot.localPresetId, fixture.root, snapshot.json), true);
+    assert.equal((await restarted.resolve(token)).presetId, 'test');
+    assert.deepEqual(JSON.parse(await readFile(exportedPath, 'utf8')).writes, [
+      { ...preset.writes[1], address: '0x00158c9c' }, preset.writes[2]
+    ]);
+    assert.equal(preset.writes.length, 3);
   } finally { fixture.close(); }
 });
 
