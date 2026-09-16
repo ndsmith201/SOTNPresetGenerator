@@ -33,6 +33,7 @@ export function validateItem(value: unknown, kind: CatalogKind): CatalogItem {
   if (!isRecord(value) || value.kind !== kind || typeof value.createdBy !== "string" || typeof value.createdAt !== "string" || !isRecord(value.data) ||
       ![value.upvotes, value.downvotes, value.score].every(Number.isSafeInteger) || Number(value.upvotes) < 0 || Number(value.downvotes) < 0) throw new Error("The community API returned an invalid item.");
   validateCatalogId(value.id);
+  if (value.createdByUsername !== undefined && typeof value.createdByUsername !== "string") throw new Error("The community API returned an invalid author username.");
   if (kind === "presets" && (!isRecord(value.data.metadata) || typeof value.data.metadata.name !== "string" || typeof value.data.metadata.id !== "string")) throw new Error("The community preset has invalid metadata.");
   if (kind === "options") {
     const option = unifiedOption(value.data);

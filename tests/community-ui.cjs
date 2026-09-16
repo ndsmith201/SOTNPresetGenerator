@@ -18,7 +18,7 @@ async function main() {
     let vote = 0;
     let deletedOption = false;
     const option = { id: 1, readOnly: false, comment: 'My shortcut', description: 'A local option', category: 'gameplay', type: 'string', value: '{"music":false}', address: null, gameInit: false, statEdit: false, rawJson: true, additionalWrites: [] };
-    const item = { id: 'community-preset', kind: 'presets', createdBy: 'runner', createdAt: '2026-09-09T20:00:00Z', upvotes: 12, downvotes: 3, score: 9, data: { ...template, metadata: { ...template.metadata, name: 'Castle challenge' }, music: false } };
+    const item = { id: 'community-preset', kind: 'presets', createdBy: '12345678-1234-1234-1234-123456789012', createdByUsername: 'runner', createdAt: '2026-09-09T20:00:00Z', upvotes: 12, downvotes: 3, score: 9, data: { ...template, metadata: { ...template.metadata, name: 'Castle challenge' }, music: false } };
     const account = () => ({ signedIn, email: signedIn ? 'runner' : '', remembered: false, config: { apiUrl: 'https://example.invalid', region: 'us-east-1', clientId: 'test', devUser: '' } });
     localStorage.setItem('sotn-preset-generator.author', 'Settings author');
     window.__calls = [];
@@ -34,7 +34,7 @@ async function main() {
         window.__calls.push(request);
         const ok = data => ({ status: 'ok', data });
         if (request.action === 'status') return ok(account());
-        if (request.action === 'list') return ok({ items: request.kind === 'presets' ? [{ ...item }] : [], nextCursor: request.kind === 'presets' && !request.cursor ? 'page-two' : undefined });
+        if (request.action === 'list') return ok({ items: request.kind === 'presets' ? [{ ...item }] : [{ ...item, id: 'community-option', kind: 'options', data: { ...option, comment: 'Shared shortcut' } }], nextCursor: request.kind === 'presets' && !request.cursor ? 'page-two' : undefined });
         if (request.action === 'get') return ok({ ...item });
         if (request.action === 'account') { signedIn = request.account.action !== 'signOut' && request.account.action !== 'signUp'; sessionStorage.setItem('ui-signed-in', String(signedIn)); return ok({ account: account(), message: signedIn ? 'Signed in.' : 'Account created. You can sign in now.' }); }
         if (!signedIn) return { status: 'error', error: 'Sign in again.' };
@@ -68,6 +68,11 @@ async function main() {
   try {
     await win.loadFile(path.join(__dirname, '../dist/renderer/index.html'));
     await waitFor(`Boolean(document.querySelector('[aria-label="View community preset Castle challenge"]'))`);
+    await waitFor(`Boolean(document.querySelector('[aria-label="View community option Shared shortcut"]'))`);
+    for (const label of ['View community preset Castle challenge', 'View community option Shared shortcut']) {
+      const author = await evaluate(`document.querySelector('[aria-label="${label}"] .preset-card-author').textContent`);
+      assert.equal(author, 'By runner');
+    }
     assert.equal(await evaluate(`document.querySelector('.preset-community-score').textContent`), '12');
     assert.equal(await evaluate(`document.querySelector('.preset-community-score').closest('.preset-card-container').querySelector('.preset-delete-button')`), null);
     await button('Load more');
@@ -77,7 +82,23 @@ async function main() {
     await click('[aria-label="View community preset Castle challenge"]');
     await waitFor(`Boolean(document.querySelector('[aria-label="Upvote, 12 upvotes"]'))`);
     assert.equal(await evaluate(`document.querySelector('.code-preview').textContent.includes('Castle challenge')`), true);
+    assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Use as template')`), true);
     await screenshot('community-preset.png');
+    win.setSize(850, 700);
+    await screenshot('community-preset-small.png');
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
+    win.setSize(1360, 900);
+    await button('Add to my presets');
+    await waitFor(`Boolean(document.querySelector('.preset-library [aria-label="Edit Castle challenge"]'))`);
+    assert.equal(await evaluate(`Boolean(document.querySelector('.workspace'))`), false);
+    await waitFor(`JSON.parse(localStorage.getItem('sotn-preset-generator.presets.v1')).length === 1`);
+    await screenshot('community-added-to-library.png');
+    await win.webContents.reload();
+    await waitFor(`Boolean(document.querySelector('.preset-library [aria-label="Edit Castle challenge"]'))`);
+    await click('[aria-label="Delete Castle challenge"]');
+    await button('Delete preset');
+    await waitFor(`JSON.parse(localStorage.getItem('sotn-preset-generator.presets.v1')).length === 0`);
+    await click('[aria-label="View community preset Castle challenge"]');
     await click('[aria-label="Upvote, 12 upvotes"]');
     await waitFor(`Boolean(document.querySelector('.login-dialog[open]'))`);
     assert.equal(await evaluate(`document.querySelector('.login-dialog').textContent.includes('Welcome')`), false);
@@ -101,7 +122,17 @@ async function main() {
     await waitFor(`Boolean(document.querySelector('[aria-label="Downvote, 3 downvotes"][aria-pressed="false"]'))`);
     await button('Use as template');
     await waitFor(`Boolean(document.querySelector('[aria-label="Actions for My shortcut"]'))`);
+    assert.deepEqual(await evaluate(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author`), template.metadata.author);
+    const toggleMode = async () => {
+      await evaluate(`document.querySelector('.built-in-settings').open = true`);
+      await click('.built-in-toggle:has(input)');
+    };
+    // A mode edit adds the current user, and reverting it removes that addition.
+    await toggleMode();
     await waitFor(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author.at(-1) === 'runner'`);
+    await toggleMode();
+    await waitFor(`!JSON.parse(document.querySelector('.code-preview').textContent).metadata.author.includes('runner')`);
+    await evaluate(`document.querySelector('.built-in-settings').open = false`);
     assert.equal(await evaluate(`localStorage.getItem('sotn-preset-generator.author')`), 'Settings author');
     await click('[aria-label="Actions for Bundled option"]');
     assert.equal(await evaluate(`document.querySelector('.option-actions-menu').textContent.trim()`), 'View');
@@ -121,7 +152,7 @@ async function main() {
     await waitFor(`!document.querySelector('.share-dialog')`);
     assert.equal(await evaluate(`window.__calls.filter(c => c.action === 'shareOption').length`), 2);
     await button('Community'); await button('Login'); await button('Sign out'); await click('[aria-label="Close login"]');
-    await waitFor(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author.at(-1) === 'Settings author'`);
+    assert.deepEqual(await evaluate(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author`), template.metadata.author);
     assert.equal(await evaluate(`JSON.parse(document.querySelector('.code-preview').textContent).metadata.author.includes('runner')`), false);
     await button('Share');
     await waitFor(`Boolean(document.querySelector('.login-dialog[open]'))`);
@@ -141,6 +172,7 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('#sharePresetDescription').value`), template.metadata.description);
     await fill('#sharePresetDescription', '  Explore the castle with shortcuts.\nA relaxed first run.  ');
     assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).metadata.description`), 'Explore the castle with shortcuts.\nA relaxed first run.');
+    assert.equal(await evaluate(`JSON.parse(document.querySelector('.share-dialog .community-json').textContent).metadata.author.at(-1)`), 'runner');
     await screenshot('community-share.png');
     await evaluate('window.__failNextShare = true');
     await button('Share publicly');

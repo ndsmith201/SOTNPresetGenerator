@@ -717,6 +717,17 @@ h1 {
   white-space: nowrap;
 }
 
+.preset-card-author {
+  display: block;
+  margin-bottom: 6px;
+  overflow: hidden;
+  color: var(--muted-bright);
+  font-size: 10px;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preset-summary {
   min-height: 32px;
   flex: 1;
@@ -801,6 +812,46 @@ h1 {
   grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
+}
+
+.workspace-with-template-notice {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.template-development-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 12px 24px;
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border-bottom: 1px solid rgba(239, 179, 79, 0.3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.template-development-banner strong,
+.template-development-banner span {
+  display: block;
+}
+
+.template-development-banner span {
+  color: var(--muted-bright);
+}
+
+.template-development-banner a {
+  color: var(--accent-bright);
+  text-underline-offset: 3px;
+}
+
+.preset-dialog-card > .template-development-banner {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgba(239, 179, 79, 0.3);
+  border-radius: 8px;
 }
 
 .options-pane,
