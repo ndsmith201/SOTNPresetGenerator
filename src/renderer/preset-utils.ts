@@ -21,7 +21,7 @@ import type {
 } from "./types";
 import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
-import { matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
+import { mainBlockStart, matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 import { ensureItemInitialization } from "./item-initialization";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
@@ -293,6 +293,7 @@ export function isDatabaseOption(value: unknown): value is DatabaseOption {
     (!value.rawJson || typeof value.value === "string") &&
     typeof value.gameInit === "boolean" &&
     (value.itemInit === undefined || typeof value.itemInit === "boolean") &&
+    (value.mainBlock === undefined || typeof value.mainBlock === "boolean") &&
     typeof value.statEdit === "boolean" &&
     typeof value.rawJson === "boolean" &&
     Array.isArray(value.writes) &&
@@ -313,8 +314,9 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
       }
     }
     const writes = option.writes;
-    const itemInit = !option.rawJson && Boolean(option.itemInit);
-    const injectRelicWrites = !option.rawJson && !option.gameInit && !itemInit &&
+    const mainBlock = !option.rawJson && Boolean(option.mainBlock);
+    const itemInit = !option.rawJson && !mainBlock && Boolean(option.itemInit);
+    const injectRelicWrites = !option.rawJson && !mainBlock && !option.gameInit && !itemInit &&
       (option.statEdit || (option.category === "relics" && !writes[0]?.address));
     return {
       id: `option:${option.id}`,
@@ -322,9 +324,10 @@ export function toPresetOptions(databaseOptions: DatabaseOption[]): PresetOption
       description: option.description ?? "",
       category: option.category,
       injectedWrites: injectRelicWrites ? writes : [],
-      gameInitWrites: option.gameInit && !itemInit ? writes : [],
+      gameInitWrites: option.gameInit && !itemInit && !mainBlock ? writes : [],
       itemInitWrites: itemInit ? writes : [],
-      appendedWrites: injectRelicWrites || option.gameInit || itemInit || option.rawJson ? [] : writes,
+      mainBlockWrites: mainBlock ? writes : [],
+      appendedWrites: injectRelicWrites || option.gameInit || itemInit || mainBlock || option.rawJson ? [] : writes,
       previewJson,
       source: structuredClone(option)
     };
@@ -345,7 +348,7 @@ export function presetIdFromName(name: string): string {
 function isReturnJump(write: WriteEntry): boolean {
   const comment = typeof write.comment === "string" ? write.comment.toLowerCase() : "";
   const value = typeof write.value === "string" ? write.value.toLowerCase() : "";
-  return value === "0x0803924f" || comment.includes("j 0x800e493c");
+  return (write.type === "word" && Number(write.value) === 0x0803924f) || value === "0x0803924f" || comment.includes("j 0x800e493c");
 }
 
 function isGameInitAnchor(write: WriteEntry): boolean {
@@ -534,7 +537,7 @@ export function buildPreviewPreset(
   } else {
     templateWrites.splice(returnIndex < 0 ? templateWrites.length : returnIndex, 0, ...injected, ...gameInit);
   }
-  // Never split the return jump from its delay slot or put option writes after it.
+  // Default patches precede the return jump and keep its delay slot intact.
   const finalReturnIndex = templateWrites.findIndex(isReturnJump);
   const firstAddressedPatch = appended.findIndex((write) => write.address !== undefined);
   if (finalReturnIndex >= 0 && firstAddressedPatch >= 0 && templateWrites[finalReturnIndex].address === undefined) {
@@ -548,6 +551,17 @@ export function buildPreviewPreset(
     if (address !== undefined) templateWrites[finalReturnIndex].address = `0x${address.toString(16).padStart(8, "0")}`;
   }
   templateWrites.splice(finalReturnIndex < 0 ? templateWrites.length : finalReturnIndex, 0, ...appended);
+  const mainBlock = additions.flatMap(option => structuredClone(option.mainBlockWrites ?? []));
+  if (mainBlock.length > 0) {
+    const start = mainBlockStart(templateWrites) ?? templateWrites.length;
+    const next = templateWrites[start];
+    // Existing trailing writes retain their targets when new patches move the cursor.
+    if (next && next.address === undefined) {
+      const address = writeLocations(templateWrites)[start].address;
+      if (address !== undefined) next.address = `0x${address.toString(16).padStart(8, "0")}`;
+    }
+    templateWrites.splice(start, 0, ...mainBlock);
+  }
   preview.writes = templateWrites;
   const merged = additions.reduce(
     (merged, option) => option.previewJson ? { ...merged, ...structuredClone(option.previewJson) } : merged,

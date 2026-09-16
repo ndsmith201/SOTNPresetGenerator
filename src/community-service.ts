@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { CommunityAuth, type CommunityStorage } from "./community-auth";
 import { CommunityClient, CommunityHttpError, isRecord } from "./community-client";
 import { optionSubmission } from "./community-options";
+import { presetSubmission } from "./community-presets";
 import type { CommunityRequest, CommunityResult } from "./community-types";
 import type { BuiltPresetStore } from "./preset-generation";
 
@@ -65,7 +66,9 @@ export class CommunityService {
         const build = await builds.resolve(request.buildToken);
         const json = await readFile(path.join(build.rootPath, "presets", `${build.presetId}.json`), "utf8");
         if (createHash("sha256").update(json).digest("hex") !== build.jsonHash) throw new Error("The exported preset changed. Export and build it again before sharing.");
-        return client.create("presets", json);
+        const preset = JSON.parse(json);
+        const submission = presetSubmission(preset);
+        return client.create("presets", submission === preset ? json : JSON.stringify(submission));
       }
       case "importOption": {
         if (request.kind !== "options") throw new Error("Only options can be imported into the option catalog.");

@@ -64,6 +64,7 @@ export interface DatabaseOption {
   value?: string;
   gameInit: boolean;
   itemInit?: boolean;
+  mainBlock?: boolean;
   statEdit: boolean;
   rawJson: boolean;
   writes: WriteEntry[];
@@ -77,6 +78,7 @@ export interface PresetOption {
   injectedWrites: WriteEntry[];
   gameInitWrites: WriteEntry[];
   itemInitWrites?: WriteEntry[];
+  mainBlockWrites?: WriteEntry[];
   appendedWrites: WriteEntry[];
   previewJson: JsonObject | null;
   source: DatabaseOption;
@@ -89,6 +91,7 @@ export interface CreateOptionInput {
   value?: string;
   gameInit?: boolean;
   itemInit?: boolean;
+  mainBlock?: boolean;
   statEdit?: boolean;
   rawJson?: boolean;
   writes: WriteEntry[];

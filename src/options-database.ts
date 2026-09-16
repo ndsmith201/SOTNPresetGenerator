@@ -219,6 +219,9 @@ function migrateOptionalWriteFields(database: DatabaseSync): void {
   if (!columns.has("item_init")) {
     database.exec("ALTER TABLE options ADD COLUMN item_init INTEGER NOT NULL DEFAULT 0 CHECK (item_init IN (0, 1))");
   }
+  if (!columns.has("main_block")) {
+    database.exec("ALTER TABLE options ADD COLUMN main_block INTEGER NOT NULL DEFAULT 0 CHECK (main_block IN (0, 1))");
+  }
   if (!columns.has("description")) {
     database.exec("ALTER TABLE options ADD COLUMN description TEXT NOT NULL DEFAULT ''");
   }

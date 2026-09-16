@@ -280,6 +280,33 @@ test('sharing strips local option fields and accepts an updated preset with its 
   assert.equal(submitted.length, 2);
 });
 
+test('preset publication removes disabled placeholders after verifying the export and leaves the local file intact', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'community-clean-preset-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, 'presets')); await mkdir(path.join(root, 'build', 'presets'), { recursive: true });
+  const preset = { ...item('presets').data, writes: [
+    { type: 'word', value: '0x00000000', address: '0x00158c98', comment: 'Disabled template option (nop)' },
+    { type: 'word', value: '0x0803924f', comment: 'j 0x800e493c' },
+    { type: 'word', value: '0x00000000', comment: 'nop' }
+  ] };
+  const json = JSON.stringify(preset);
+  const file = path.join(root, 'presets/example.json');
+  await writeFile(file, json);
+  await writeFile(path.join(root, 'build/presets/example.js'), 'module.exports = {}');
+  const database = new DatabaseSync(':memory:'); t.after(() => database.close());
+  const builds = new BuiltPresetStore(database);
+  const token = await builds.remember(root, 'example', { localPresetId: 'local-draft', json });
+  const store = storage(); store.write('config', JSON.stringify({ ...DEFAULT_COMMUNITY_CONFIG, apiUrl: 'http://localhost:8080', devUser: 'alice' }));
+  const submitted = [];
+  const service = new CommunityService({ database, storage: store, builds,
+    createOption() { throw new Error('Unexpected import'); }, loadOption() { throw new Error('Unexpected option'); },
+    fetcher: async (_url, init) => { submitted.push(JSON.parse(init.body)); return response(item('presets'), 201); } });
+  assert.equal((await service.request({ action: 'sharePreset', buildToken: token })).status, 'ok');
+  assert.deepEqual(submitted[0], { ...preset, writes: [{ ...preset.writes[1], address: '0x00158c9c' }, preset.writes[2]] });
+  assert.equal(await readFile(file, 'utf8'), json);
+  assert.equal((await builds.resolve(token)).presetId, 'example');
+});
+
 test('sharing an authored memory option sends only API fields and preserves its local first write', async t => {
   const database = new DatabaseSync(':memory:'); t.after(() => database.close());
   const primaryWrite = { type: 'word', value: 0, address: '0x1234', comment: 'First write note', custom: { keep: true } };
