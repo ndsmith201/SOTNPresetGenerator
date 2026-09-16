@@ -8,6 +8,7 @@ const { mainBlockStart, writeLocations } = require('../dist/renderer/template-op
 const { initializeOptionsCatalog } = require('../dist/options-database');
 const { optionSubmission } = require('../dist/community-options');
 const template = require('../templates/preset-template.json');
+const bundledMainBlockIds = [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 46, 47, 58, 59, 62, 67, 73, 74, 76, 77];
 const word = (value, extra = {}) => ({ type: 'word', value, ...extra });
 const row = (id, writes, extra = {}) => ({ id, comment: `Patch ${id}`, description: '', category: 'world',
   mainBlock: true, itemInit: false, gameInit: false, statEdit: false, rawJson: false, readOnly: false, writes, ...extra });
@@ -88,16 +89,34 @@ test('copying and sharing preserve main block placement and JSON mode clears it'
 test('existing and new databases persist main block options across catalog initialization', async () => {
   const schema = readFileSync('database/schema.sql', 'utf8');
   const dump = readFileSync('database/options-dump.sql', 'utf8');
-  for (const installed of [false, true]) {
+  const legacyDump = `${dump}\nALTER TABLE options DROP COLUMN main_block;`;
+  for (const installed of ['new', 'legacy', 'tracked']) {
     const db = new DatabaseSync(':memory:');
     try {
-      if (installed) db.exec(dump);
+      if (installed === 'legacy') db.exec(legacyDump);
+      if (installed === 'tracked') await initializeOptionsCatalog(db, schema, async () => legacyDump);
       await initializeOptionsCatalog(db, schema, async () => dump);
       db.prepare("INSERT INTO options (comment, category, type, value, main_block, writes_json) VALUES ('Main block patch', 'world', 'word', '0', 1, ?)")
         .run(JSON.stringify([word('0x12345678')]));
       await initializeOptionsCatalog(db, schema, async () => dump);
       assert.equal(db.prepare("SELECT main_block FROM options WHERE comment = 'Main block patch'").get().main_block, 1);
-      assert.equal(db.prepare('SELECT count(*) AS count FROM options WHERE read_only = 1 AND main_block != 0').get().count, 0);
+      assert.deepEqual(db.prepare('SELECT id FROM options WHERE read_only = 1 AND main_block = 1 ORDER BY id').all().map(option => option.id), bundledMainBlockIds);
     } finally { db.close(); }
   }
+});
+
+test('selected built-in options emit their original writes after the return and nop anchor', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    await initializeOptionsCatalog(db, readFileSync('database/schema.sql', 'utf8'),
+      async () => readFileSync('database/options-dump.sql', 'utf8'));
+    const selected = db.prepare('SELECT * FROM options WHERE main_block = 1 ORDER BY id').all();
+    assert.deepEqual(selected.map(option => option.id), bundledMainBlockIds);
+    const options = toPresetOptions(selected.map(option => row(option.id, JSON.parse(option.writes_json), {
+      comment: option.comment, category: option.category, mainBlock: Boolean(option.main_block),
+      gameInit: Boolean(option.game_init), itemInit: Boolean(option.item_init), statEdit: Boolean(option.stat_edit)
+    })));
+    const output = generate(undefined, options);
+    assert.deepEqual(output.writes.slice(mainBlockStart(output.writes)), selected.flatMap(option => JSON.parse(option.writes_json)));
+  } finally { db.close(); }
 });
