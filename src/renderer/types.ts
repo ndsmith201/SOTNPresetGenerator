@@ -110,7 +110,8 @@ export interface PresetAppApi {
   createOption: (request: CreateOptionInput) => Promise<unknown>;
   updateOption: (id: number, request: CreateOptionInput) => Promise<unknown>;
   chooseSotnRandoPath: (currentPath?: string) => Promise<unknown>;
-  exportPreset: (request: { sotnRandoPath: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
+  chooseRandoToolsPath: (currentPath?: string) => Promise<unknown>;
+  exportPreset: (request: { sotnRandoPath: string; randoToolsPath?: string; presetName: string; json: string; localPresetId: string }) => Promise<unknown>;
   getSuccessfulExports: () => Promise<Record<string, SuccessfulExport>>;
   generatePreset: (buildToken: string, seedName?: string) => Promise<unknown>;
   windowControls: {

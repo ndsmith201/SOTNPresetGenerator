@@ -15,6 +15,7 @@ import { CommunityService } from "./community-service";
 import { presetSubmission } from "./community-presets";
 import { optionWrites, unifiedOption } from "./option-writes";
 import { AppUpdater } from "./app-updater";
+import { exportRandoToolsPreset } from "./randotools-export";
 import type { CommunityRequest } from "./community-types";
 
 const execFileAsync = promisify(execFile);
@@ -370,10 +371,32 @@ function registerWindowControls(): void {
     return { canceled: false, path: rootPath };
   });
 
+  ipcMain.handle("randotools:choose-path", async (event, currentPath: unknown) => {
+    try {
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const launcherPath = path.join(process.env.LOCALAPPDATA || path.join(app.getPath("home"), "AppData", "Local"),
+        "Programs", "Symphony of the Night Randomizer Launcher", "apps", "RandoTools", "SotnRandoTools");
+      const options: OpenDialogOptions = {
+        title: "Choose the SotnRandoTools directory",
+        defaultPath: typeof currentPath === "string" && await isDirectory(currentPath) ? currentPath
+          : await isDirectory(launcherPath) ? launcherPath : app.getPath("home"),
+        properties: ["openDirectory"]
+      };
+      const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+      const rootPath = path.resolve(result.filePaths[0]);
+      if (!(await isDirectory(rootPath))) return { error: "The selected RandoTools directory does not exist." };
+      return { canceled: false, path: rootPath };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Unable to choose a RandoTools directory." };
+    }
+  });
+
   ipcMain.handle("preset:export", async (event, request: unknown) => {
     if (generatingPreset) return { status: "error", error: "Wait for patch generation to finish before exporting." };
     if (!request || typeof request !== "object") return { status: "error", error: "Invalid export request." };
-    const { sotnRandoPath, presetName, json, localPresetId } = request as Record<string, unknown>;
+    const { sotnRandoPath, randoToolsPath, presetName, json, localPresetId } = request as Record<string, unknown>;
+    if (randoToolsPath !== undefined && typeof randoToolsPath !== "string") return { status: "error", error: "Invalid RandoTools directory." };
     if (typeof sotnRandoPath !== "string" || typeof presetName !== "string" || typeof json !== "string" || typeof localPresetId !== "string" || !localPresetId) {
       return { status: "error", error: "Invalid export request." };
     }
@@ -428,11 +451,37 @@ function registerWindowControls(): void {
 
     try {
       builtPresets.forget(rootPath, presetId);
-      await writeFile(exportPath, `${JSON.stringify(presetSubmission(presetRecord), null, 2)}\n`, "utf8");
+      const exportedJson = `${JSON.stringify(presetSubmission(presetRecord), null, 2)}\n`;
+      await writeFile(exportPath, exportedJson, "utf8");
       await registerPreset(rootPath, presetId);
       await buildPresetFiles(rootPath);
       const buildToken = await builtPresets.remember(rootPath, presetId, { localPresetId, json });
-      return { status: "exported", path: exportPath, presetId, buildToken };
+      let toolsExportPath: string | undefined;
+      let warning: string | undefined;
+      try {
+        if (randoToolsPath && path.resolve(randoToolsPath) === rootPath) {
+          toolsExportPath = exportPath;
+        } else {
+          const result = await exportRandoToolsPreset(randoToolsPath, presetId, exportedJson, async (filePath) => {
+            const owner = BrowserWindow.fromWebContents(event.sender);
+            const options = {
+              type: "warning" as const,
+              title: "Replace RandoTools preset?",
+              message: `${path.basename(filePath)} already exists in RandoTools.`,
+              detail: filePath,
+              buttons: ["Replace", "Cancel"], defaultId: 1, cancelId: 1
+            };
+            const response = owner ? await dialog.showMessageBox(owner, options) : await dialog.showMessageBox(options);
+            return response.response === 0;
+          });
+          if (result.status === "exported") toolsExportPath = result.path;
+          else if (result.status === "canceled") warning = "Preset exported and built. RandoTools copy canceled.";
+          else if (randoToolsPath) warning = "Preset exported and built. RandoTools directory no longer exists; copy skipped.";
+        }
+      } catch (error) {
+        warning = `Preset exported and built, but the RandoTools copy failed: ${error instanceof Error ? error.message : "Unknown error"}`;
+      }
+      return { status: "exported", path: exportPath, presetId, buildToken, randoToolsPath: toolsExportPath, warning };
     } catch (error) {
       console.error("Unable to export preset", error);
       const detail = error instanceof Error ? error.message : "Unknown build error";

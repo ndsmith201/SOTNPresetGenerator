@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { copyFile, mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { DatabaseSync } from "node:sqlite";
@@ -116,20 +116,22 @@ export function normalizeSeedName(seedName: unknown): string | undefined {
 export async function generatePatch(build: BuiltPreset, executablePath: string, outputPath: string, seedName?: string): Promise<void> {
   const seed = normalizeSeedName(seedName);
   if (path.extname(outputPath).toLowerCase() !== ".ppf") throw new Error("Choose a .ppf output file.");
+  const verifyExport = async () => {
+    if (await hashFile(path.join(build.rootPath, "presets", `${build.presetId}.json`)) !== build.jsonHash
+      || await hashFile(path.join(build.rootPath, "build", "presets", `${build.presetId}.js`)) !== build.buildHash) {
+      throw new Error(exportFirst);
+    }
+  };
+  await verifyExport();
   const temporary = await mkdtemp(path.join(path.dirname(outputPath), ".sotn-generate-"));
-  let presetTemporary: string | undefined;
   try {
-    // Upstream loads presets with require('./' + path.relative(...)). Keep
-    // the snapshot on its drive so a Windows output drive cannot produce './D:\...'.
-    presetTemporary = await mkdtemp(path.join(build.rootPath, ".sotn-generate-"));
-    const presetFile = path.join(presetTemporary, "preset.json");
-    await copyFile(path.join(build.rootPath, "presets", `${build.presetId}.json`), presetFile);
-    if (await hashFile(presetFile) !== build.jsonHash) throw new Error(exportFirst);
     const patchFile = path.join(temporary, "patch.ppf");
     // yargs otherwise mistakes a packaged Electron Node subprocess for a GUI
     // app and treats the script filename as a positional seed URL.
     const bootstrap = "process.defaultApp = true; require(process.argv[1]);";
-    const args = ["-e", bootstrap, path.join(build.rootPath, "randomize"), "--preset-file", presetFile, "--out", patchFile];
+    // Export registers and compiles this ID. Named generation also embeds it
+    // in the game so RandoTools can find the matching preset JSON.
+    const args = ["-e", bootstrap, path.join(build.rootPath, "randomize"), "--preset", build.presetId, "--out", patchFile];
     if (seed !== undefined) args.push(`--seed=${seed}`);
     await execFileAsync(executablePath, args, {
       cwd: build.rootPath,
@@ -139,12 +141,11 @@ export async function generatePatch(build: BuiltPreset, executablePath: string, 
       maxBuffer: 20 * 1024 * 1024
     });
     if ((await stat(patchFile)).size === 0) throw new Error("The randomizer produced an empty patch.");
+    // Discard the result if another process edited the export during generation.
+    await verifyExport();
     // Keep the previous output intact if generation fails or times out.
     await rename(patchFile, outputPath);
   } finally {
-    await Promise.all([
-      rm(temporary, { recursive: true, force: true }),
-      ...(presetTemporary ? [rm(presetTemporary, { recursive: true, force: true })] : [])
-    ]);
+    await rm(temporary, { recursive: true, force: true });
   }
 }

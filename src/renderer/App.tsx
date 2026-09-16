@@ -5,6 +5,7 @@ import { UpdateDialog } from "./components/UpdateDialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PRESET_AUTHOR_KEY,
+  RANDOTOOLS_PATH_KEY,
   SOTNRANDO_PATH_KEY
 } from "./constants";
 import { CreateOptionDialog } from "./components/CreateOptionDialog";
@@ -72,6 +73,7 @@ export function App() {
   const operationPending = useRef(false);
   const [toast, setToast] = useState("");
   const [exportPath, setExportPath] = useState(() => localStorage.getItem(SOTNRANDO_PATH_KEY) ?? "");
+  const [randoToolsPath, setRandoToolsPath] = useState(() => localStorage.getItem(RANDOTOOLS_PATH_KEY) ?? "");
   const [installedPresets, setInstalledPresets] = useState<InstalledPreset[]>([]);
   const [installedLoading, setInstalledLoading] = useState(false);
   const [installedMessage, setInstalledMessage] = useState("");
@@ -277,6 +279,21 @@ export function App() {
     return result.path;
   }, [exportPath, showToast]);
 
+  const chooseRandoToolsPath = async () => {
+    try {
+      const result = await window.presetApp.chooseRandoToolsPath(randoToolsPath || undefined);
+      if (!isJsonObject(result)) throw new Error("Unable to choose a RandoTools directory");
+      if (result.canceled === true) return;
+      if (typeof result.error === "string") throw new Error(result.error);
+      if (typeof result.path !== "string") throw new Error("Unable to choose a RandoTools directory");
+      localStorage.setItem(RANDOTOOLS_PATH_KEY, result.path);
+      setRandoToolsPath(result.path);
+      showToast("RandoTools directory updated");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to choose a RandoTools directory");
+    }
+  };
+
   const exportPreset = async (json = previewJson) => {
     if (!activePreset || !preview || operationPending.current) return;
     operationPending.current = true;
@@ -290,12 +307,12 @@ export function App() {
         delete next[key];
         return next;
       });
-      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, presetName: activePreset.name, json, localPresetId: activePreset.id });
+      const result = await window.presetApp.exportPreset({ sotnRandoPath: destination, randoToolsPath, presetName: activePreset.name, json, localPresetId: activePreset.id });
       if (!isJsonObject(result)) throw new Error("Export failed");
       if (result.status === "exported" && typeof result.path === "string" && typeof result.buildToken === "string") {
         const exported = { localPresetId: activePreset.id, directory: destination, json, buildToken: result.buildToken };
         setSuccessfulExports((current) => ({ ...current, [key]: exported }));
-        showToast(`Exported and built ${result.path.split(/[\\/]/).pop() ?? "preset file"}`);
+        showToast(typeof result.warning === "string" ? result.warning : `Exported and built ${result.path.split(/[\\/]/).pop() ?? "preset file"}${typeof result.randoToolsPath === "string" ? "; copied to RandoTools" : ""}`);
         setInstalledRevision((value) => value + 1);
         return exported;
       }
@@ -426,7 +443,7 @@ export function App() {
   return (
     <>
       <div className="app-shell">
-        <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} exportPath={exportPath} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onChooseExportPath={() => void chooseExportPath()} />
+        <WindowBar onCommunity={() => { afterLogin.current = null; setLoginOpen(true); }} editing={Boolean(activePreset)} exportPath={exportPath} randoToolsPath={randoToolsPath} onChooseRandoToolsPath={() => void chooseRandoToolsPath()} author={author} onEditAuthor={() => setAuthorSettingsOpen(true)} onDeletePreset={() => setPresetToDelete(activePreset)} onNewPreset={() => setCreatePresetOpen(true)} onSavePreset={() => showToast("Preset saved locally")} onShowLibrary={showLibrary} onChooseExportPath={() => void chooseExportPath()} />
         <TopBar communityActions={communityActions} onShare={() => requestShare("preset")} editing={Boolean(activePreset || communityItem)} presetCount={presets.length} exporting={exporting} generating={generating} canGenerate={canGenerate} onNewPreset={() => setCreatePresetOpen(true)} onBack={showLibrary} onExport={() => { void exportPreset().catch(() => {}); }} onGenerate={() => setGenerateDialogOpen(true)} onSave={() => showToast("Preset saved locally")} />
         {communityItem ? <div className="community-preset-view">
           {communityError && <p className="community-error" role="alert">{communityError}</p>}

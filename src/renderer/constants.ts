@@ -2,6 +2,7 @@ import type { BuiltInSettings, MetaExtension, OptionCategory, WriteType } from "
 
 export const STORAGE_KEY = "sotn-preset-generator.presets.v1";
 export const SOTNRANDO_PATH_KEY = "sotn-preset-generator.sotnrando-path";
+export const RANDOTOOLS_PATH_KEY = "sotn-preset-generator.randotools-path";
 export const PRESET_AUTHOR_KEY = "sotn-preset-generator.author";
 export const MIN_COMPLEXITY = 1;
 export const DEFAULT_COMPLEXITY = 1;
