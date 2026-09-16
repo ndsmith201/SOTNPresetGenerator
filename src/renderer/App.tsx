@@ -209,13 +209,13 @@ export function App() {
         .finally(() => { communityPending.current = false; setCommunityBusy(false); });
     });
   };
-  const importCommunity = async () => {
+  const importCommunity = async (openPresetEditor = true) => {
     if (!communityItem || communityPending.current) return;
     if (!initialized) { showToast("The option catalog is still loading"); return; }
     if (communityItem.kind === "presets") {
-      const preset = createPresetFromTemplate(communityItemName(communityItem).slice(0, 60), communityItem.data, options);
-      setPresets(current => [...current, preset]); setActivePresetId(preset.id); setCommunityItem(null);
-      showToast("Community preset copied to your local drafts");
+      const preset = createPresetFromTemplate(communityItemName(communityItem), communityItem.data, options);
+      setPresets(current => [...current, preset]); setActivePresetId(openPresetEditor ? preset.id : null); setCommunityItem(null);
+      showToast(openPresetEditor ? "Community preset copied to your local drafts" : "Community preset added to your presets");
       return;
     }
     communityPending.current = true; setCommunityBusy(true); setCommunityError("");
@@ -414,7 +414,8 @@ export function App() {
   };
   const communityVote = communityItem ? votes[`${communityItem.kind}:${communityItem.id}`] : undefined;
   const communityActions = communityItem && <>
-    <button className="button button-primary" disabled={communityBusy || !initialized} onClick={() => void importCommunity()}>{communityItem.kind === "presets" ? "Use as template" : "Add to my options"}</button>
+    {communityItem.kind === "presets" && <button className="button button-primary" disabled={communityBusy || !initialized} onClick={() => void importCommunity(false)}>Add to my presets</button>}
+    <button className={`button ${communityItem.kind === "presets" ? "button-ghost" : "button-primary"}`} disabled={communityBusy || !initialized} onClick={() => void importCommunity()}>{communityItem.kind === "presets" ? "Use as template" : "Add to my options"}</button>
     <div className="preset-votes" aria-label="Community votes">
       <button className="button button-ghost button-with-icon" disabled={communityBusy} aria-label={`Upvote, ${communityItem.upvotes} upvotes`} aria-pressed={communityVote === 1} onClick={() => vote(communityVote === 1 ? 0 : 1)}><Icon name="thumb-up" />{communityItem.upvotes}</button>
       <button className="button button-ghost button-with-icon" disabled={communityBusy} aria-label={`Downvote, ${communityItem.downvotes} downvotes`} aria-pressed={communityVote === -1} onClick={() => vote(communityVote === -1 ? 0 : -1)}><Icon name="thumb-down" />{communityItem.downvotes}</button>
@@ -430,7 +431,7 @@ export function App() {
         {communityItem ? <div className="community-preset-view">
           {communityError && <p className="community-error" role="alert">{communityError}</p>}
           {communityPreset ? <PresetEditor key={communityItem.id} readOnly preset={communityPreset} maximumComplexity={Math.max(communityPreset.complexity, calculatePresetMaxComplexity(template, communityPreset, options))} options={options.filter(option => communityPreset.optionIds.includes(option.id))} preview={communityItem.data} onChange={() => {}} onNewOption={() => {}} onEditOption={() => {}} onShareOption={() => {}} onDeleteOption={() => {}} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied community JSON"), () => showToast("Unable to copy JSON")); }} /> : communityOption ? <CreateOptionDialog key={communityItem.id} inline open option={communityOption} options={[]} onClose={showLibrary} /> : <main className="workspace"><section className="options-pane"><span className="step-label">Community option</span><h2>{communityItemName(communityItem)}</h2><p>This definition cannot be displayed in the option editor. Its original JSON is available for inspection.</p></section><JsonPreview community preview={communityItem.data} onCopy={() => { void navigator.clipboard.writeText(JSON.stringify(communityItem.data, null, 2)).then(() => showToast("Copied option JSON"), () => showToast("Unable to copy JSON")); }} /></main>}
-          {communityItem.kind === "presets" && <p className="community-template-note">Use as template to edit a local copy. The editor rebuilds location rules and does not resolve inherited presets; review the resulting JSON before exporting.</p>}
+          {communityItem.kind === "presets" && <p className="community-template-note">Add to my presets saves a copy to your library. Use as template opens a copy in the editor. Your name is added to the authors only when you change the preset.</p>}
         </div> : activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onShareOption={requestShare} onDeleteOption={setOptionToDelete} onCopy={() => void copyPreview()} /> : <PresetLibrary onViewCommunity={viewCommunity} presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
       <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
@@ -442,7 +443,7 @@ export function App() {
       {optionToDelete && <DeleteOptionDialog option={optionToDelete} onClose={() => setOptionToDelete(null)} onDelete={deleteOption} />}
       <Toast message={toast} />
       {updateOpen && updateState && <UpdateDialog state={updateState} onLater={() => setUpdateDismissed(true)} onRestart={restartForUpdate} />}
-      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : optionSubmission(shareTarget.source)} needsBuild={shareTarget === "preset" && !canGenerate} onClose={() => setShareTarget(null)} onShare={share} />}
+      {shareTarget && (shareTarget !== "preset" || preview) && <ShareDialog name={shareTarget === "preset" ? activePreset?.name ?? "Preset" : shareTarget.label} kind={shareTarget === "preset" ? "preset" : "option"} json={shareTarget === "preset" ? preview! : optionSubmission(shareTarget.source)} needsBuild={shareTarget === "preset" && !canGenerate} getPresetPreview={shareTarget === "preset" && activePreset ? description => buildPreviewPreset(template, { ...activePreset, description }, options, effectiveAuthor, maximumComplexity) : undefined} onClose={() => setShareTarget(null)} onShare={share} />}
       {loginOpen && <LoginDialog onClose={() => { setLoginOpen(false); setVotes({}); afterLogin.current = null; }} onSignedIn={() => { setLoginOpen(false); setVotes({}); const next = afterLogin.current; afterLogin.current = null; next?.(); }} />}
     </>
   );

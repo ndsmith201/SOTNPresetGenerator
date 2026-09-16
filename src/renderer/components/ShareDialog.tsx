@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { JsonObject } from "../types";
 import { isJsonObject } from "../preset-utils";
 
-export function ShareDialog({ name, kind, json, needsBuild, onClose, onShare }: {
+export function ShareDialog({ name, kind, json, needsBuild, getPresetPreview, onClose, onShare }: {
   name: string; kind: "preset" | "option"; json: JsonObject; needsBuild: boolean;
   onClose: () => void; onShare: (description?: string) => Promise<void>;
+  getPresetPreview?: (description: string) => JsonObject | null;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const pending = useRef(false);
@@ -14,7 +15,7 @@ export function ShareDialog({ name, kind, json, needsBuild, onClose, onShare }: 
   const [description, setDescription] = useState(currentDescription);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const reviewJson = kind === "preset" ? { ...json, metadata: { ...metadata, description: description.trim() } } : json;
+  const reviewJson = kind === "preset" ? getPresetPreview?.(description.trim()) ?? { ...json, metadata: { ...metadata, description: description.trim() } } : json;
   useEffect(() => { ref.current?.showModal(); }, []);
   const close = () => { if (!pending.current) onClose(); };
   return <dialog className="preset-dialog share-dialog" ref={ref} aria-labelledby="shareTitle" onCancel={event => { event.preventDefault(); close(); }}>

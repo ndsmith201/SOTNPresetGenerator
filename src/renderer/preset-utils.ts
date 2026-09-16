@@ -215,6 +215,24 @@ export function calculatePresetMaxComplexity(template: JsonObject | null, preset
   return calculateMaxComplexity(source, selected, preset.metaExtension);
 }
 
+export function hasPresetEdits(template: JsonObject, preset: Preset, options: PresetOption[], complexity: number, maximumComplexity: number): boolean {
+  const original = preset.baseTemplate ?? template;
+  const metadata = isJsonObject(original.metadata) ? original.metadata : {};
+  const inheritedIds = new Set(preset.baseTemplate
+    ? (preset.templateOptionMatches ?? matchTemplateOptions(original, options)).map(match => match.optionId)
+    : []);
+  const selectedIds = new Set(preset.optionIds);
+  const originalSettings = normalizeBuiltInSettings(original);
+  return preset.name !== metadata.name
+    || (preset.description !== undefined && preset.description !== (metadata.description ?? ""))
+    || preset.metaExtension !== templateExtension(original)
+    || BUILT_IN_TOGGLES.some(({ key }) => preset.builtInSettings[key] !== originalSettings[key])
+    || selectedIds.size !== inheritedIds.size
+    || [...selectedIds].some(id => !inheritedIds.has(id))
+    // Automatic clamping on import is not a user edit.
+    || complexity !== normalizeComplexity(templateComplexity(original), maximumComplexity);
+}
+
 function presetTemplate(template: JsonObject | null, preset: Preset): JsonObject | null {
   if (!template) return null;
   if (!preset.baseTemplate) return template;
@@ -429,7 +447,8 @@ export function buildPreviewPreset(
   const preview = structuredClone(source);
   const extension = normalizeMetaExtension(preset.metaExtension);
   const selected = options.filter((option) => preset.optionIds.includes(option.id));
-  const complexity = normalizeComplexity(preset.complexity, maximumComplexity ?? calculatePresetMaxComplexity(template, preset, options));
+  const complexityLimit = maximumComplexity ?? calculatePresetMaxComplexity(template, preset, options);
+  const complexity = normalizeComplexity(preset.complexity, complexityLimit);
   const matchedIds = new Set(preset.templateOptionMatches?.map((match) => match.optionId));
   const additions = selected.filter((option) => !matchedIds.has(option.id));
   const extensionChanged = !preset.baseTemplate || extension !== templateExtension(source);
@@ -541,9 +560,11 @@ export function buildPreviewPreset(
   mergedMetadata.metaComplexity = complexity.toString();
   if (extensionChanged || !Object.hasOwn(mergedMetadata, "metaExtension")) mergedMetadata.metaExtension = extension;
   const configuredAuthor = author?.trim();
-  if (configuredAuthor) {
+  if (configuredAuthor && template && hasPresetEdits(template, preset, options, complexity, complexityLimit)) {
     const existingAuthors = Array.isArray(mergedMetadata.author) ? mergedMetadata.author : [];
-    mergedMetadata.author = [...existingAuthors, configuredAuthor];
+    if (!existingAuthors.some(existing => typeof existing === "string" && existing.trim().toLowerCase() === configuredAuthor.toLowerCase())) {
+      mergedMetadata.author = [...existingAuthors, configuredAuthor];
+    }
   }
   merged.metadata = mergedMetadata;
   merged.complexityGoal = { ...(isJsonObject(merged.complexityGoal) ? merged.complexityGoal : {}), min: complexity };

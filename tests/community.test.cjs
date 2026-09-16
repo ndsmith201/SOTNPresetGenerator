@@ -56,6 +56,18 @@ test('community client exercises all nine OpenAPI operations against a local HTT
   }
 });
 
+test('community responses retain resolved usernames without replacing creator IDs', async () => {
+  const subject = '12345678-1234-1234-1234-123456789012';
+  for (const kind of ['presets', 'options']) {
+    const client = new CommunityClient(DEFAULT_COMMUNITY_CONFIG, async () => 'unused', async () => response({ items: [item(kind, { createdBy: subject, createdByUsername: 'runner' })] }));
+    const result = (await client.list(kind)).items[0];
+    assert.equal(result.createdBy, subject);
+    assert.equal(result.createdByUsername, 'runner');
+  }
+  const invalid = new CommunityClient(DEFAULT_COMMUNITY_CONFIG, async () => 'unused', async () => response({ items: [item('options', { createdByUsername: { name: 'runner' } })] }));
+  await assert.rejects(invalid.list('options'), /invalid author username/);
+});
+
 test('pagination retains an empty page cursor and encodes it opaquely', async () => {
   const cursor = 'a+/=?& spaces';
   const urls = [];

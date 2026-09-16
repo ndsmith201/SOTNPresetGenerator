@@ -41,10 +41,17 @@ export function CommunityPresets({ kind = "presets", onOpen }: { kind?: CatalogK
     <div className="preset-grid">
       {visible.map(item => {
         const metadata = item.data.metadata as Record<string, unknown> | undefined;
+        const authors = (Array.isArray(metadata?.author) ? metadata.author : [metadata?.author])
+          .filter((author): author is string => typeof author === "string" && Boolean(author.trim()))
+          .map(author => author.trim());
+        const creator = item.createdByUsername?.trim()
+          || (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(item.createdBy) ? "Unknown author" : item.createdBy);
+        const author = authors.join(", ") || creator;
         return <div className="preset-card-container" key={item.id}>
           <button className="preset-card" type="button" aria-label={`View community ${kind === "presets" ? "preset" : "option"} ${communityItemName(item)}`} onClick={() => onOpen(item)}>
             <span className="preset-card-top"><span className="preset-card-icon"><Icon name="diamond" /></span><span className="preset-option-count">Community</span></span>
             <strong className="preset-card-name">{communityItemName(item)}</strong>
+            <span className="preset-card-author" title={`By ${author}`}>By {author}</span>
             <span className="preset-summary">{String(metadata?.description || item.data.description || "Shared with the community")}</span>
             <span className="preset-card-footer"><span>{formatUpdatedDate(item.createdAt)}</span><span className="preset-card-arrow">View <Icon name="arrow" /></span></span>
           </button>

@@ -15,6 +15,7 @@ export interface CatalogItem {
   id: string;
   kind: CatalogKind;
   createdBy: string;
+  createdByUsername?: string;
   createdAt: string;
   upvotes: number;
   downvotes: number;
