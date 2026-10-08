@@ -9,7 +9,7 @@ interface PresetEditorProps {
   options: PresetOption[];
   maximumComplexity: number;
   preview: JsonObject | null;
-  onChange: (changes: Partial<Preset>) => void;
+  onChange: (changes: Partial<Preset>) => string | void;
   onNewOption: () => void;
   onEditOption: (option: PresetOption) => void;
   onShareOption: (option: PresetOption) => void;

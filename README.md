@@ -80,6 +80,8 @@ The app opens to **Your presets**, a library of editable local drafts. Each card
 
 Use **New preset**, the library's plus button, or **File → New preset** to create another draft. Names can contain up to 60 characters and can be changed in the editor. The name also determines the generated preset ID and export filename: for example, `Weekend challenge` becomes `weekend-challenge.json`.
 
+Draft names must produce unique IDs in your library, including when creating from a template, adding a community preset, or renaming. Differences in case, accents, spaces, or punctuation can still produce the same ID. If a community preset conflicts, the app asks for a different name before saving your copy.
+
 ![New preset dialog with a name field and starting template selector](docs/screenshots/create-preset.png)
 
 ### Installed presets

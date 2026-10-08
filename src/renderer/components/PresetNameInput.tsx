@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 
-export function PresetNameInput({ name, onSave }: { name: string; onSave: (name: string) => void }) {
+export function PresetNameInput({ name, onSave }: { name: string; onSave: (name: string) => string | void }) {
   const [draft, setDraft] = useState(name);
   useEffect(() => setDraft(name), [name]);
   const save = () => {
     const trimmed = draft.trim();
+    if (trimmed && trimmed !== name) {
+      const saveError = onSave(trimmed);
+      if (saveError) { setDraft(name); return; }
+    }
     setDraft(trimmed || name);
-    if (trimmed && trimmed !== name) onSave(trimmed);
   };
   return (
     <label className="preset-name-field">

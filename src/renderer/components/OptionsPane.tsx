@@ -12,7 +12,7 @@ interface OptionsPaneProps {
   preset: Preset;
   options: PresetOption[];
   maximumComplexity: number;
-  onChange: (changes: Partial<Preset>) => void;
+  onChange: (changes: Partial<Preset>) => string | void;
   onNewOption: () => void;
   onEditOption: (option: PresetOption) => void;
   onShareOption: (option: PresetOption) => void;
