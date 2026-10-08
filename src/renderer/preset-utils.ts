@@ -345,6 +345,14 @@ export function presetIdFromName(name: string): string {
   return id || "preset";
 }
 
+export function presetNameError(name: string, presets: readonly Pick<Preset, "id" | "name">[], excludeId?: string): string {
+  if (!name.trim()) return "Enter a name to continue.";
+  // Names that produce the same export filename must be unique in the library.
+  const id = presetIdFromName(name);
+  const collision = presets.find(preset => preset.id !== excludeId && presetIdFromName(preset.name) === id);
+  return collision ? `A preset named “${collision.name}” already exists in your library. Choose a different name.` : "";
+}
+
 function isReturnJump(write: WriteEntry): boolean {
   const comment = typeof write.comment === "string" ? write.comment.toLowerCase() : "";
   const value = typeof write.value === "string" ? write.value.toLowerCase() : "";

@@ -20,7 +20,7 @@ import { InstalledPresetDialog } from "./components/InstalledPresetDialog";
 import { Toast } from "./components/Toast";
 import { TopBar } from "./components/TopBar";
 import { WindowBar } from "./components/WindowBar";
-import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTemplate, isDatabaseOption, isJsonObject, loadPresets, normalizeComplexity, persistPresets, presetIdFromName, toPresetOptions } from "./preset-utils";
+import { buildPreviewPreset, calculatePresetMaxComplexity, createPresetFromTemplate, isDatabaseOption, isJsonObject, loadPresets, normalizeComplexity, persistPresets, presetIdFromName, presetNameError, toPresetOptions } from "./preset-utils";
 import type { CreateOptionInput, DatabaseOption, InstalledPreset, JsonObject, Preset, PresetOption } from "./types";
 import { selectTemplateOptions } from "./template-options";
 import { exportMatchesCurrent, type SuccessfulExport } from "./export-state";
@@ -80,6 +80,7 @@ export function App() {
   const [installedRevision, setInstalledRevision] = useState(0);
   const [viewingInstalled, setViewingInstalled] = useState<InstalledPreset | null>(null);
   const [initialTemplate, setInitialTemplate] = useState("");
+  const [communityTemplate, setCommunityTemplate] = useState<{ item: CatalogItem; openPresetEditor: boolean } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
   const showToast = useCallback((message: string) => {
@@ -215,8 +216,16 @@ export function App() {
     if (!communityItem || communityPending.current) return;
     if (!initialized) { showToast("The option catalog is still loading"); return; }
     if (communityItem.kind === "presets") {
-      const preset = createPresetFromTemplate(communityItemName(communityItem), communityItem.data, options);
-      setPresets(current => [...current, preset]); setActivePresetId(openPresetEditor ? preset.id : null); setCommunityItem(null);
+      const name = communityItemName(communityItem);
+      const error = presetNameError(name, presets);
+      if (error) {
+        setCommunityTemplate({ item: communityItem, openPresetEditor });
+        setCreatePresetOpen(true);
+        showToast(error);
+        return;
+      }
+      const preset = createPresetFromTemplate(name.trim(), communityItem.data, options);
+      setPresets(current => presetNameError(preset.name, current) ? current : [...current, preset]); setActivePresetId(openPresetEditor ? preset.id : null); setCommunityItem(null);
       showToast(openPresetEditor ? "Community preset copied to your local drafts" : "Community preset added to your presets");
       return;
     }
@@ -245,8 +254,14 @@ export function App() {
 
   const updateActivePreset = useCallback((changes: Partial<Preset>) => {
     if (!activePresetId) return;
-    setPresets((current) => current.map((preset) => preset.id === activePresetId ? { ...preset, ...changes, updatedAt: new Date().toISOString() } : preset));
-  }, [activePresetId]);
+    if (changes.name !== undefined) {
+      const error = presetNameError(changes.name, presets, activePresetId);
+      if (error) { showToast(error); return error; }
+      changes = { ...changes, name: changes.name.trim() };
+    }
+    setPresets((current) => changes.name !== undefined && presetNameError(changes.name, current, activePresetId)
+      ? current : current.map((preset) => preset.id === activePresetId ? { ...preset, ...changes, updatedAt: new Date().toISOString() } : preset));
+  }, [activePresetId, presets, showToast]);
 
   useEffect(() => {
     if (template && activePreset && activePreset.complexity !== boundedComplexity) {
@@ -255,13 +270,17 @@ export function App() {
   }, [template, activePreset, boundedComplexity, updateActivePreset]);
 
   const createPreset = (name: string, fileName: string) => {
-    if (!initialized) { showToast("The option catalog is still loading"); return; }
+    if (!initialized) return "The option catalog is still loading.";
+    const error = presetNameError(name, presets);
+    if (error) return error;
     const source = fileName ? installedPresets.find((preset) => preset.fileName === fileName) : undefined;
-    if (fileName && !source) { showToast("The selected template is unavailable"); return; }
-    const preset = createPresetFromTemplate(name, source?.json, options);
-    setPresets((current) => [...current, preset]);
+    if (!communityTemplate && fileName && !source) return "The selected template is unavailable.";
+    const preset = createPresetFromTemplate(name.trim(), communityTemplate?.item.data ?? source?.json, options);
+    setPresets((current) => presetNameError(preset.name, current) ? current : [...current, preset]);
     setCommunityItem(null);
-    setActivePresetId(preset.id);
+    setActivePresetId(communityTemplate && !communityTemplate.openPresetEditor ? null : preset.id);
+    showToast(communityTemplate ? (communityTemplate.openPresetEditor ? "Community preset copied to your local drafts" : "Community preset added to your presets") : "");
+    setCommunityTemplate(null);
     setCreatePresetOpen(false);
     setInitialTemplate("");
   };
@@ -451,7 +470,7 @@ export function App() {
           {communityItem.kind === "presets" && <p className="community-template-note">Add to my presets saves a copy to your library. Use as template opens a copy in the editor. Your name is added to the authors only when you change the preset.</p>}
         </div> : activePreset ? <PresetEditor key={activePreset.id} preset={{ ...activePreset, complexity: boundedComplexity }} maximumComplexity={maximumComplexity} options={options} preview={preview} onChange={updateActivePreset} onNewOption={() => { setEditingOption(null); setCreateOptionOpen(true); }} onEditOption={(option) => { setEditingOption(option.source); setCreateOptionOpen(true); }} onShareOption={requestShare} onDeleteOption={setOptionToDelete} onCopy={() => void copyPreview()} /> : <PresetLibrary onViewCommunity={viewCommunity} presets={presets} optionLabels={optionLabels} onCreate={() => setCreatePresetOpen(true)} onOpen={(preset) => setActivePresetId(preset.id)} onDelete={setPresetToDelete} installedPresets={installedPresets} installedConfigured={Boolean(exportPath)} installedLoading={installedLoading} installedMessage={installedMessage} onViewInstalled={setViewingInstalled} onRefreshInstalled={() => setInstalledRevision((value) => value + 1)} />}
       </div>
-      <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); }} onSubmit={createPreset} />
+      <CreatePresetDialog open={createPresetOpen} installedPresets={installedPresets} loading={installedLoading} message={installedMessage} initialTemplate={initialTemplate} initialName={communityTemplate ? communityItemName(communityTemplate.item) : ""} sourceName={communityTemplate ? communityItemName(communityTemplate.item) : undefined} onError={showToast} onClose={() => { setCreatePresetOpen(false); setInitialTemplate(""); setCommunityTemplate(null); showToast(""); }} onSubmit={createPreset} />
       {generateDialogOpen && <GeneratePresetDialog onClose={() => setGenerateDialogOpen(false)} onSubmit={seedName => void generatePreset(seedName)} />}
       <InstalledPresetDialog preset={viewingInstalled} onClose={() => setViewingInstalled(null)} onCreate={(preset) => { setViewingInstalled(null); setInitialTemplate(preset.fileName); setCreatePresetOpen(true); }} onCopy={(preset) => { void navigator.clipboard.writeText(JSON.stringify(preset.json, null, 2)).then(() => showToast("Copied installed JSON"), () => showToast("Unable to copy JSON")); }} />
       {!communityOption && <CreateOptionDialog open={createOptionOpen} option={editingOption} options={options.map(item => item.source)} onClose={closeOptionDialog} onSubmit={saveOption} />}
