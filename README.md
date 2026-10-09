@@ -76,6 +76,10 @@ Community account settings and import mappings are local and excluded from relea
 
 The app opens to **Your presets**, a library of editable local drafts. Each card shows the preset's name, selected-option count, option summary, and last update time. Drafts are ordered by most recently updated. Click a card to resume editing, or use its trash button to delete it after confirmation. Deleting a local draft does not delete an exported JSON file.
 
+A static **Community Highlight** banner above the library loads the featured mod's title, description, and uploaded artwork once per configured API per app session. It does not require signing in. Returning to the library, focusing the app, account changes, renderer reloads, and download errors reuse the cached result. Artwork is cached in memory so its signed URL cannot expire when the banner is reopened. Changing the API loads that API once; switching back reuses its cached highlight. Restart the app to fetch newly published or edited metadata, or retry unavailable metadata/artwork. **Download** updates from the saved `releaseTime` without polling; the API remains responsible for enforcing release time on the actual PPF request.
+
+**Download** opens a Save dialog for a `.ppf` file and requests `/v1/featured-mods/{id}/download` separately from metadata. The API enforces the release time, and the app follows its private S3 or local file redirect, validates the PPF header, and saves only a complete download. Canceling leaves files unchanged. If no featured mod is published or the API is unavailable, the banner shows placeholder content with Download disabled. Deploy the featured-mod API routes before expecting live content.
+
 ![Local preset cards and the separate read-only installed preset section](docs/screenshots/preset-library.png)
 
 Use **New preset**, the library's plus button, or **File → New preset** to create another draft. Names can contain up to 60 characters and can be changed in the editor. The name also determines the generated preset ID and export filename: for example, `Weekend challenge` becomes `weekend-challenge.json`.

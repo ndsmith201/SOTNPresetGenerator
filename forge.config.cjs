@@ -20,7 +20,7 @@ const runtimeFiles = new Set([
   '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
   '/database/bundled-options-baseline.json',
   '/database/migrations/001-built-in-option-descriptions.sql',
-  '/assets/icons/castle-moon.ico'
+  '/assets/icons/castle-moon.ico', '/assets/icons/castle-moon.png'
 ]);
 const runtimeDirectories = new Set(['', '/', '/dist', '/dist/renderer', '/database', '/database/migrations', '/templates', '/node_modules', '/assets', '/assets/icons']);
 

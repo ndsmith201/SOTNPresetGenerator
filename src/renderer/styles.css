@@ -2226,3 +2226,160 @@ kbd {
 .option-actions-menu button:hover, .option-actions-menu button:focus-visible { background: var(--surface-hover); outline: 1px solid var(--border-strong); }
 .option-actions-menu button.danger-text { color: #eb8e8e; }
 .option-actions-menu svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.community-highlight {
+  --community-highlight-artwork-max: 340px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  max-width: 1180px;
+  min-height: 230px;
+  margin: 0 auto 30px;
+  padding: 25px 28px;
+  border: 1px solid rgba(239, 179, 79, 0.3);
+  border-radius: var(--radius);
+  background: radial-gradient(ellipse at 86% 10%, var(--accent-soft), transparent 70%), #15140f;
+}
+
+.community-highlight-without-artwork {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.community-highlight-copy {
+  min-width: 0;
+  /* The copy column is 1.2 times the artwork column; mirror its centered inset. */
+  padding-inline-start: max(0px, calc((100% / 1.2 - var(--community-highlight-artwork-max)) / 2));
+}
+
+.community-highlight-without-artwork .community-highlight-copy {
+  padding-inline-start: 0;
+}
+
+.community-highlight-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+}
+
+.community-highlight-kicker svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.community-highlight-copy h2 {
+  margin: 0 0 11px;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.community-highlight-description {
+  max-width: 620px;
+  margin: 0 0 18px;
+  color: var(--muted-bright);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.community-highlight-download:hover:not(:disabled) {
+  background: var(--accent-bright);
+}
+
+.community-highlight-download:disabled {
+  cursor: not-allowed;
+}
+
+.community-highlight-download[aria-busy="true"] {
+  cursor: wait;
+}
+
+.community-highlight-download:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 3px;
+}
+
+.community-highlight-download-note {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.community-highlight-error {
+  max-width: 620px;
+  margin: 12px 0 0;
+  color: #ffb4b4;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.community-highlight-artwork {
+  width: 100%;
+  max-width: var(--community-highlight-artwork-max);
+  min-width: 0;
+  justify-self: center;
+}
+
+.community-highlight-artwork img {
+  display: block;
+  width: 100%;
+  height: 184px;
+  object-fit: contain;
+  border: 1px solid rgba(239, 179, 79, 0.2);
+  border-radius: 11px;
+  background: rgba(9, 11, 14, 0.55);
+  box-shadow: 0 9px 22px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 700px) {
+  .community-highlight {
+    gap: 18px;
+    padding: 23px 22px;
+  }
+
+  .community-highlight-copy h2 {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 550px) {
+  .community-highlight {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding: 23px 18px;
+  }
+
+  .community-highlight-copy {
+    padding-inline-start: 0;
+  }
+
+  .community-highlight-artwork {
+    max-width: var(--community-highlight-artwork-max);
+    justify-self: start;
+  }
+}
+
+@media (pointer: coarse) {
+  .community-highlight-download {
+    min-height: 44px;
+  }
+}

@@ -1,7 +1,7 @@
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
 import type { OpenDialogOptions } from "electron";
 import { execFile } from "node:child_process";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
@@ -544,6 +544,27 @@ if (squirrelStartup) {
         builds: builtPresets,
         createOption: (input) => ({ ...createOption(input) }),
         loadOption: (id) => ({ ...loadOption(id) }),
+        saveFeaturedMod: async (fileName, download) => {
+          const owner = BrowserWindow.getFocusedWindow();
+          const options = {
+            title: "Save featured mod PPF",
+            defaultPath: path.join(app.getPath("downloads"), fileName),
+            filters: [{ name: "PPF patch", extensions: ["ppf"] }]
+          };
+          const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
+          if (result.canceled || !result.filePath) return { canceled: true };
+          const filePath = result.filePath;
+          if (path.extname(filePath).toLowerCase() !== ".ppf") throw new Error("Choose a .ppf file for the featured mod.");
+          const data = await download();
+          const temporaryRoot = await mkdtemp(path.join(path.dirname(filePath), ".sotn-featured-mod-"));
+          const temporary = path.join(temporaryRoot, "patch.ppf");
+          try {
+            await writeFile(temporary, data, { flag: "wx" });
+            await rename(temporary, filePath);
+          } finally { await rm(temporaryRoot, { recursive: true, force: true }); }
+          shell.showItemInFolder(filePath);
+          return { canceled: false, filePath };
+        },
         storage: {
           read: (key) => database.prepare("SELECT value FROM community_settings WHERE key = ?").get(key)?.value as string | undefined,
           write: (key, value) => {
