@@ -1,0 +1,34 @@
+name: Build Windows
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Validate Windows x64 installers
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit
+      - name: Run tests
+        run: npm test
+      - name: Validate the committed options snapshot
+        run: npm run options:check
+      - name: Build Windows installer and ZIP
+        run: npm run make -- --platform=win32 --arch=x64

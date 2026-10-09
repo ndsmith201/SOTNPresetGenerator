@@ -7,12 +7,13 @@ const { crc32 } = require('node:zlib');
 const { createRequire } = require('node:module');
 const { pipeline } = require('node:stream/promises');
 
-// Exercise the actual transitive dependencies and import style used by Forge.
+// Exercise Forge 8's packager extraction wrapper and native rebuild dependencies.
+// The supported Node versions can load the packager's ESM exports from CommonJS.
 const packagerPath = require.resolve('@electron/packager');
 const { extractElectronZip } = require(path.join(path.dirname(packagerPath), 'unzip.js'));
 const rebuildRequire = createRequire(require.resolve('@electron/rebuild'));
-const tar = rebuildRequire('tar');
-const { ExternalEditor } = require('external-editor');
+const nodeGypRequire = createRequire(rebuildRequire.resolve('node-gyp'));
+const tar = nodeGypRequire('tar');
 
 function workspace(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sotn-build-deps-'));
@@ -49,7 +50,7 @@ function zipEntry(filename, content, mode = 0o100644) {
   return Buffer.concat([local, name, data, central, name, end]);
 }
 
-test('Forge packager extracts a normal ZIP with the replacement extractor', async t => {
+test('Forge packager extracts a normal ZIP with its upstream extractor', async t => {
   const directory = workspace(t);
   const zip = path.join(directory, 'normal.zip');
   const output = path.join(directory, 'output');
@@ -89,13 +90,4 @@ test('native rebuild tar dependency supports file and streaming extraction', asy
   fs.unlinkSync(path.join(output, 'header.h'));
   await pipeline(fs.createReadStream(archive), tar.extract({ cwd: output }));
   assert.equal(fs.readFileSync(path.join(output, 'header.h'), 'utf8'), 'Header fixture');
-});
-
-test('Forge external editor can create and remove its temporary file', () => {
-  const editor = new ExternalEditor('Temporary editor content');
-  const filename = editor.tempFile;
-  try {
-    assert.equal(fs.readFileSync(filename, 'utf8'), 'Temporary editor content');
-  } finally { editor.cleanup(); }
-  assert.equal(fs.existsSync(filename), false);
 });

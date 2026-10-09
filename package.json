@@ -10,7 +10,7 @@
   "description": "A desktop UI for assembling Symphony of the Night presets.",
   "main": "dist/main.js",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -19,7 +19,7 @@
     "dev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "publish": "electron-forge publish",
+    "publish": "electron-forge release",
     "release": "node scripts/release.cjs",
     "options:dump": "node scripts/export-options.cjs",
     "options:check": "node scripts/export-options.cjs --check",
@@ -30,9 +30,7 @@
     "forge": "./forge.config.cjs"
   },
   "overrides": {
-    "tar": "7.5.22",
-    "tmp": "0.2.7",
-    "extract-zip": "npm:@electron-internal/extract-zip@1.0.5"
+    "tar": "7.5.22"
   },
   "dependencies": {
     "electron-squirrel-startup": "1.0.1",
@@ -40,10 +38,10 @@
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@electron-forge/cli": "7.11.2",
-    "@electron-forge/maker-squirrel": "7.11.2",
-    "@electron-forge/maker-zip": "7.11.2",
-    "@electron-forge/publisher-github": "7.11.2",
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-squirrel": "8.0.1",
+    "@electron-forge/maker-zip": "8.0.1",
+    "@electron-forge/publisher-github": "8.0.1",
     "@types/electron-squirrel-startup": "1.0.2",
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.10",
