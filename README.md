@@ -261,9 +261,9 @@ The complexity slider's maximum is calculated from all location locks in the sel
 
 ## Run locally
 
-Requires Node.js 22.12 or newer.
+Requires Node.js 22.13 or newer.
 
-The lockfile includes security overrides for Forge's transitive dependencies: `tar` 7.5.22, `tmp` 0.2.7, and `extract-zip` replaced by `@electron-internal/extract-zip` 1.0.5. The [Electron ZIP extractor](https://github.com/electron/extract-zip) provides path and symlink containment for Electron archives. These pins keep the stable Forge release compatible with patched tooling; review them when upgrading Forge. Release CI runs `npm audit` and stops if it reports vulnerabilities.
+Electron Forge 8 uses the [Electron ZIP extractor](https://github.com/electron/extract-zip) directly for path and symlink containment when unpacking Electron archives. The lockfile pins patched dependencies and retains a `tar` 7.5.22 override for native build tooling. Windows build and release CI run `npm audit` and stop if it reports vulnerabilities.
 
 ```bash
 npm install
