@@ -23,6 +23,18 @@ export interface CatalogItem {
   data: Record<string, unknown>;
 }
 export interface CatalogPage { items: CatalogItem[]; nextCursor?: string }
+export interface CommunityFeaturedMod {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  releaseTime: string;
+  downloadAvailable: boolean;
+  downloadUrl: string;
+  createdBy: string;
+  createdAt: string;
+}
+export interface CommunityDownloadResult { canceled: boolean; filePath?: string }
 export type AccountAction = "signIn" | "signUp" | "confirm" | "resend" | "forgot" | "reset" | "signOut";
 export interface AccountRequest { action: AccountAction; username?: string; email?: string; password?: string; code?: string }
 export type CommunityRequest =
@@ -30,6 +42,8 @@ export type CommunityRequest =
   | { action: "configure"; config: CommunityConfig }
   | { action: "account"; account: AccountRequest }
   | { action: "health" }
+  | { action: "featuredMod"; apiUrl?: string }
+  | { action: "downloadFeaturedMod"; id: string; title: string }
   | { action: "list"; kind: CatalogKind; cursor?: string }
   | { action: "get" | "importOption"; kind: CatalogKind; id: string }
   | { action: "vote"; kind: CatalogKind; id: string; value: -1 | 0 | 1 }

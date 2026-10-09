@@ -1,10 +1,13 @@
 import type { CatalogItem } from "../../community-types";
 import { CommunityPresets } from "./CommunityPresets";
+import { CommunityHighlightBanner } from "./CommunityHighlightBanner";
+import type { CommunityHighlightState } from "../community-highlight";
 import type { InstalledPreset, Preset } from "../types";
 import { formatUpdatedDate } from "../preset-utils";
 import { Icon } from "./Icon";
 
 interface PresetLibraryProps {
+  communityHighlight: CommunityHighlightState;
   presets: Preset[];
   onViewCommunity: (item: CatalogItem) => void;
   optionLabels: Map<string, string>;
@@ -19,10 +22,11 @@ interface PresetLibraryProps {
   onRefreshInstalled: () => void;
 }
 
-export function PresetLibrary({ onViewCommunity, presets, optionLabels, onCreate, onOpen, onDelete, installedPresets, installedConfigured, installedLoading, installedMessage, onViewInstalled, onRefreshInstalled }: PresetLibraryProps) {
+export function PresetLibrary({ communityHighlight, onViewCommunity, presets, optionLabels, onCreate, onOpen, onDelete, installedPresets, installedConfigured, installedLoading, installedMessage, onViewInstalled, onRefreshInstalled }: PresetLibraryProps) {
   const ordered = [...presets].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return (
     <main className="preset-library">
+      <CommunityHighlightBanner {...communityHighlight} />
       <div className="library-heading">
         <div><span className="step-label">Preset library</span><h2>Your presets</h2><p>Create a configuration or continue working on an existing one.</p></div>
         <button className="icon-button create-icon-button" type="button" aria-label="Create a new preset" title="Create a new preset" onClick={onCreate}><Icon name="plus" /></button>

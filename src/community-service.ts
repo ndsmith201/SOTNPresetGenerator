@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { CommunityAuth, type CommunityStorage } from "./community-auth";
-import { CommunityClient, CommunityHttpError, isRecord } from "./community-client";
+import { CommunityClient, CommunityHttpError, isRecord, validateCatalogId, validateConfig } from "./community-client";
 import { optionSubmission } from "./community-options";
 import { presetSubmission } from "./community-presets";
-import type { CommunityRequest, CommunityResult } from "./community-types";
+import type { CommunityDownloadResult, CommunityFeaturedMod, CommunityRequest, CommunityResult } from "./community-types";
 import type { BuiltPresetStore } from "./preset-generation";
 
 interface LocalOption { id: number; [key: string]: unknown }
@@ -17,11 +17,13 @@ interface Dependencies {
   createOption: (data: unknown) => LocalOption;
   loadOption: (id: number) => LocalOption;
   fetcher?: typeof fetch;
+  saveFeaturedMod?: (fileName: string, download: () => Promise<Uint8Array>) => Promise<CommunityDownloadResult>;
 }
 
 export class CommunityService {
   readonly auth: CommunityAuth;
   private pending: Promise<unknown> = Promise.resolve();
+  private featuredMods = new Map<string, Promise<CommunityFeaturedMod | null>>();
   constructor(private deps: Dependencies) {
     this.auth = new CommunityAuth(deps.storage, deps.fetcher);
     deps.database.exec(`CREATE TABLE IF NOT EXISTS community_option_imports (
@@ -35,7 +37,7 @@ export class CommunityService {
     const result = this.pending.then(async (): Promise<CommunityResult> => {
       try { return { status: "ok", data: await this.perform(request) }; }
       catch (error) {
-        if (error instanceof CommunityHttpError && error.status === 401) {
+        if (error instanceof CommunityHttpError && error.status === 401 && request.action !== "featuredMod" && request.action !== "downloadFeaturedMod") {
           this.auth.invalidateSession();
           return { status: "error", error: "Your community session was rejected. Sign in again." };
         }
@@ -44,6 +46,24 @@ export class CommunityService {
     });
     this.pending = result;
     return result;
+  }
+  private featuredMod(apiUrl?: string): Promise<CommunityFeaturedMod | null> {
+    const config = apiUrl === undefined ? this.auth.config : validateConfig({ ...this.auth.config, apiUrl, devUser: "" });
+    let metadata = this.featuredMods.get(config.apiUrl);
+    if (!metadata) {
+      const client = new CommunityClient(config, () => this.auth.accessToken(), this.deps.fetcher);
+      metadata = client.featuredMod().then(async mod => {
+        if (!mod) return null;
+        // Retain the artwork bytes for this app session so signed URLs do not
+        // expire when the library or renderer is reopened. Failed artwork is hidden.
+        const image = await client.featuredArtwork(mod.image).catch(() => "");
+        return { ...mod, image };
+      });
+      // Keep successful, missing, and failed results: metadata is requested once
+      // per configured API for the lifetime of the main process.
+      this.featuredMods.set(config.apiUrl, metadata);
+    }
+    return metadata;
   }
   private async perform(request: CommunityRequest): Promise<unknown> {
     if (!isRecord(request)) throw new Error("Invalid community request.");
@@ -54,6 +74,16 @@ export class CommunityService {
       case "configure": return this.auth.configure(request.config);
       case "account": return this.auth.account(request.account);
       case "health": await client.health(); return { message: "Community service is reachable." };
+      case "featuredMod": return this.featuredMod(request.apiUrl);
+      case "downloadFeaturedMod": {
+        const id = validateCatalogId(request.id);
+        if (typeof request.title !== "string" || !request.title.trim() || Buffer.byteLength(request.title, "utf8") > 200) throw new Error("Invalid featured mod title.");
+        if (!this.deps.saveFeaturedMod) throw new Error("Featured mod downloads are unavailable.");
+        let name = request.title.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/[. ]+$/, "").slice(0, 120).replace(/[. ]+$/, "");
+        if (!name) name = "community-mod";
+        if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) name = `mod-${name}`;
+        return this.deps.saveFeaturedMod(`${name}.ppf`, () => client.downloadFeaturedMod(id));
+      }
       case "list": return client.list(request.kind, request.cursor);
       case "get": return client.get(request.kind, request.id);
       case "vote": return client.vote(request.kind, request.id, request.value);
