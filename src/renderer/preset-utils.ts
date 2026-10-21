@@ -23,6 +23,7 @@ import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
 import { mainBlockStart, matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 import { ensureItemInitialization } from "./item-initialization";
+import { ensureInjectedCode } from "./injected-code";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -500,6 +501,9 @@ export function buildPreviewPreset(
   const templateWrites = Array.isArray(sourceWrites)
     ? sourceWrites.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
+  const needsInjectedCode = selected.some(option => option.injectedWrites.length > 0 ||
+    option.gameInitWrites.length > 0 || (option.itemInitWrites?.length ?? 0) > 0);
+  if (preset.baseTemplate && needsInjectedCode) ensureInjectedCode(templateWrites);
   const itemInit = additions.flatMap(option => structuredClone(option.itemInitWrites ?? []));
   if (itemInit.length > 0) {
     const { start, end } = ensureItemInitialization(templateWrites);

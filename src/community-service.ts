@@ -6,7 +6,7 @@ import { CommunityAuth, type CommunityStorage } from "./community-auth";
 import { CommunityClient, CommunityHttpError, isRecord, validateCatalogId, validateConfig } from "./community-client";
 import { optionSubmission } from "./community-options";
 import { presetSubmission } from "./community-presets";
-import type { CommunityDownloadResult, CommunityFeaturedMod, CommunityRequest, CommunityResult } from "./community-types";
+import type { CommunityConfig, CommunityDownloadResult, CommunityFeaturedMod, CommunityRequest, CommunityResult } from "./community-types";
 import type { BuiltPresetStore } from "./preset-generation";
 
 interface LocalOption { id: number; [key: string]: unknown }
@@ -24,6 +24,7 @@ export class CommunityService {
   readonly auth: CommunityAuth;
   private pending: Promise<unknown> = Promise.resolve();
   private featuredMods = new Map<string, Promise<CommunityFeaturedMod | null>>();
+  private featuredArtworks = new Map<string, Promise<string>>();
   constructor(private deps: Dependencies) {
     this.auth = new CommunityAuth(deps.storage, deps.fetcher);
     deps.database.exec(`CREATE TABLE IF NOT EXISTS community_option_imports (
@@ -31,20 +32,21 @@ export class CommunityService {
       PRIMARY KEY (api_url, catalog_id)
     )`);
   }
-  // Serialize account/config changes with requests, and prevent simultaneous imports
-  // from creating duplicate local IDs. Failures must not poison the queue.
+  // Reads observe preceding account/config changes without queuing behind each
+  // other. Mutations stay serialized, including duplicate local-option imports.
   request(request: CommunityRequest): Promise<CommunityResult> {
+    const publicRead = isRecord(request) && ["status", "health", "list", "get", "featuredMod", "featuredArtwork"].includes(request.action);
     const result = this.pending.then(async (): Promise<CommunityResult> => {
       try { return { status: "ok", data: await this.perform(request) }; }
       catch (error) {
-        if (error instanceof CommunityHttpError && error.status === 401 && request.action !== "featuredMod" && request.action !== "downloadFeaturedMod") {
+        if (error instanceof CommunityHttpError && error.status === 401 && !publicRead && request.action !== "downloadFeaturedMod") {
           this.auth.invalidateSession();
           return { status: "error", error: "Your community session was rejected. Sign in again." };
         }
         return { status: "error", error: error instanceof Error ? error.message : "Community operation failed." };
       }
     });
-    this.pending = result;
+    if (!publicRead) this.pending = result;
     return result;
   }
   private featuredMod(apiUrl?: string): Promise<CommunityFeaturedMod | null> {
@@ -52,18 +54,31 @@ export class CommunityService {
     let metadata = this.featuredMods.get(config.apiUrl);
     if (!metadata) {
       const client = new CommunityClient(config, () => this.auth.accessToken(), this.deps.fetcher);
-      metadata = client.featuredMod().then(async mod => {
-        if (!mod) return null;
-        // Retain the artwork bytes for this app session so signed URLs do not
-        // expire when the library or renderer is reopened. Failed artwork is hidden.
-        const image = await client.featuredArtwork(mod.image).catch(() => "");
-        return { ...mod, image };
+      metadata = client.featuredMod().then(mod => {
+        // Start retaining signed artwork immediately, without delaying text.
+        void this.cacheFeaturedArtwork(config, mod);
+        return mod;
       });
       // Keep successful, missing, and failed results: metadata is requested once
       // per configured API for the lifetime of the main process.
       this.featuredMods.set(config.apiUrl, metadata);
     }
     return metadata;
+  }
+  private featuredArtwork(apiUrl?: string): Promise<string> {
+    const config = apiUrl === undefined ? this.auth.config : validateConfig({ ...this.auth.config, apiUrl, devUser: "" });
+    return this.featuredMod(config.apiUrl).then(mod => this.cacheFeaturedArtwork(config, mod), () => this.cacheFeaturedArtwork(config, null));
+  }
+  private cacheFeaturedArtwork(config: CommunityConfig, mod: CommunityFeaturedMod | null): Promise<string> {
+    let artwork = this.featuredArtworks.get(config.apiUrl);
+    if (!artwork) {
+      const client = new CommunityClient(config, () => this.auth.accessToken(), this.deps.fetcher);
+      // Only the main-process metadata cache supplies image URLs. Return text
+      // immediately; separately retain artwork bytes, including failed results.
+      artwork = mod ? client.featuredArtwork(mod.image).catch(() => "") : Promise.resolve("");
+      this.featuredArtworks.set(config.apiUrl, artwork);
+    }
+    return artwork;
   }
   private async perform(request: CommunityRequest): Promise<unknown> {
     if (!isRecord(request)) throw new Error("Invalid community request.");
@@ -74,7 +89,11 @@ export class CommunityService {
       case "configure": return this.auth.configure(request.config);
       case "account": return this.auth.account(request.account);
       case "health": await client.health(); return { message: "Community service is reachable." };
-      case "featuredMod": return this.featuredMod(request.apiUrl);
+      case "featuredMod": {
+        const mod = await this.featuredMod(request.apiUrl);
+        return mod ? { ...mod, image: "" } : null;
+      }
+      case "featuredArtwork": return this.featuredArtwork(request.apiUrl);
       case "downloadFeaturedMod": {
         const id = validateCatalogId(request.id);
         if (typeof request.title !== "string" || !request.title.trim() || Buffer.byteLength(request.title, "utf8") > 200) throw new Error("Invalid featured mod title.");

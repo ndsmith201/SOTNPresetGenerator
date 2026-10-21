@@ -2339,7 +2339,8 @@ kbd {
   justify-self: center;
 }
 
-.community-highlight-artwork img {
+.community-highlight-artwork img,
+.community-highlight-artwork-placeholder {
   display: block;
   width: 100%;
   height: 184px;

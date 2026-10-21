@@ -29,11 +29,12 @@ async function main() {
       createdAt: '2026-10-07T18:00:00Z', updatedAt: '2026-10-07T18:00:00Z'
     }]));
     window.__fixture = {
-      mod: initialMod, metadataMode: 'ok', downloadMode: 'cancel',
-      apiUrl: 'https://first-api.example.invalid', deferredMetadata: [], deferredDownload: [], statusDelayMs: 0
+      mod: initialMod, metadataMode: 'ok', artworkMode: 'defer', listMode: 'defer', downloadMode: 'cancel',
+      apiUrl: 'https://first-api.example.invalid', artworkSources: {}, deferredMetadata: [], deferredArtwork: [], deferredLists: [], deferredDownload: [], statusDelayMs: 0
     };
     window.__calls = [];
     window.__metadataCalls = [];
+    window.__artworkCalls = [];
     const account = () => ({ signedIn: false, email: '', remembered: false,
       config: { apiUrl: window.__fixture.apiUrl, region: 'us-east-1', clientId: 'test', devUser: '' } });
     const ok = data => ({ status: 'ok', data });
@@ -49,12 +50,24 @@ async function main() {
           if (fixture.statusDelayMs) await new Promise(resolve => setTimeout(resolve, fixture.statusDelayMs));
           return ok(account());
         }
-        if (request.action === 'list') return ok({ items: [] });
+        if (request.action === 'list') {
+          if (fixture.listMode === 'defer') return new Promise(resolve => fixture.deferredLists.push(resolve));
+          return ok({ items: [] });
+        }
         if (request.action === 'featuredMod') {
-          window.__metadataCalls.push(fixture.apiUrl);
+          const apiUrl = request.apiUrl || fixture.apiUrl;
+          window.__metadataCalls.push(apiUrl);
+          fixture.artworkSources[apiUrl] = fixture.mod?.image || '';
           if (fixture.metadataMode === 'error') return { status: 'error', error: 'Featured service unavailable' };
           if (fixture.metadataMode === 'defer') return new Promise(resolve => fixture.deferredMetadata.push(resolve));
-          return ok(fixture.mod && { ...fixture.mod });
+          return ok(fixture.mod && { ...fixture.mod, image: '' });
+        }
+        if (request.action === 'featuredArtwork') {
+          const apiUrl = request.apiUrl || fixture.apiUrl;
+          window.__artworkCalls.push(apiUrl);
+          if (fixture.artworkMode === 'error') return { status: 'error', error: 'Featured artwork unavailable' };
+          if (fixture.artworkMode === 'defer') return new Promise(resolve => fixture.deferredArtwork.push(resolve));
+          return ok(fixture.artworkSources[apiUrl] || '');
         }
         if (request.action === 'downloadFeaturedMod') {
           if (fixture.downloadMode === 'error') return { status: 'error', error: 'The PPF could not be downloaded. Try again.' };
@@ -83,6 +96,7 @@ async function main() {
   const title = `document.querySelector('.community-highlight h2')?.textContent`;
   const disabled = `document.querySelector('.community-highlight-download')?.disabled`;
   const metadataCount = `window.__calls.filter(call => call.action === 'featuredMod').length`;
+  const artworkCount = `window.__calls.filter(call => call.action === 'featuredArtwork').length`;
   const downloadCount = `window.__calls.filter(call => call.action === 'downloadFeaturedMod').length`;
   const focus = () => evaluate(`window.dispatchEvent(new Event('focus'))`);
   const clickDownload = () => evaluate(`document.querySelector('.community-highlight-download').click()`);
@@ -102,26 +116,47 @@ async function main() {
   try {
     await win.loadFile(path.join(__dirname, '../dist/renderer/index.html'));
     await waitFor(`${title} === 'Clockwork Castle'`);
-    await waitFor(`document.querySelector('.community-highlight-artwork img')?.naturalWidth > 0`);
+    await waitFor(`window.__fixture.deferredArtwork.length === 1 && window.__fixture.deferredLists.length >= 2`);
     assert.equal(await evaluate(`document.querySelector('.community-highlight-description').textContent`), mod.description);
-    assert.equal(await evaluate(`document.querySelector('.community-highlight-artwork img').getAttribute('src')`), artwork);
+    assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight-artwork img'))`), false);
+    const artworkBounds = await evaluate(`(() => { const bounds = document.querySelector('.community-highlight-artwork').getBoundingClientRect(); return { width: bounds.width, height: bounds.height }; })()`);
+    assert.ok(artworkBounds.width > 0 && artworkBounds.height > 0, 'Pending artwork must reserve its space.');
+    assert.equal(await evaluate(`document.querySelector('.community-highlight-download').checkVisibility()`), true);
     assert.equal(await evaluate(disabled), true);
     assert.match(await evaluate(`document.querySelector('.community-highlight-download-note').textContent`), /^Available /);
     await clickDownload();
     assert.equal(await evaluate(downloadCount), 0);
     assert.equal(await evaluate(`window.__calls.some(call => call.action === 'account')`), false);
-    results.push('Published metadata and artwork render publicly; release time keeps Download disabled.');
+    const loading = await screenshot('banner-artwork-pending-1360.png');
+    results.push('Title, description, and Download render publicly while catalog requests and artwork are still pending; the image area reserves its space.');
 
     assert.equal(await evaluate(metadataCount), 1);
+    assert.equal(await evaluate(artworkCount), 1);
     await focus();
     await focus();
     await pause(100);
     assert.equal(await evaluate(metadataCount), 1);
     await waitFor(`${disabled} === false`);
+    assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight-artwork img'))`), false);
+    assert.equal(await evaluate(`window.__fixture.deferredArtwork.length`), 1);
     assert.equal(await evaluate(metadataCount), 1);
+    assert.equal(await evaluate(artworkCount), 1);
     assert.equal(await evaluate(downloadCount), 0);
     assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight-download-note'))`), false);
-    results.push('StrictMode and focus fetch metadata once; the release deadline enables Download without another metadata request.');
+    results.push('StrictMode and focus fetch each stage once; the release deadline enables Download without waiting for artwork or refreshing metadata.');
+
+    await evaluate(`
+      window.__fixture.artworkMode = 'ok';
+      window.__fixture.listMode = 'ok';
+      window.__fixture.deferredArtwork.shift()({ status: 'ok', data: ${JSON.stringify(artwork)} });
+      for (const resolve of window.__fixture.deferredLists.splice(0)) resolve({ status: 'ok', data: { items: [] } });
+      true;
+    `);
+    await waitFor(`document.querySelector('.community-highlight-artwork img')?.naturalWidth > 0`);
+    assert.equal(await evaluate(`document.querySelector('.community-highlight-artwork img').getAttribute('src')`), artwork);
+    assert.deepEqual(await evaluate(`(() => { const bounds = document.querySelector('.community-highlight-artwork').getBoundingClientRect(); return { width: bounds.width, height: bounds.height }; })()`), artworkBounds,
+      'Artwork loading must preserve the reserved dimensions.');
+    results.push('Artwork arrives separately and fills the reserved area without moving the banner layout.');
 
     // Unrelated account renders and library remounts reuse the same metadata.
     await clickButton('Community');
@@ -171,6 +206,7 @@ async function main() {
       assert.equal(paint.imageSrc, artwork, 'Returning to the library must preserve the cached artwork URL in every render.');
     }
     assert.equal(await evaluate(metadataCount), 1);
+    assert.equal(await evaluate(artworkCount), 1);
     assert.equal(await evaluate(disabled), false);
     results.push('Account status changes and leaving/returning to the preset library preserve the first rendered title, description, and image URL with one metadata request, even when status IPC is delayed.');
 
@@ -230,14 +266,18 @@ async function main() {
     };
     const firstApi = 'https://first-api.example.invalid';
     const secondApi = 'https://second-api.example.invalid';
-    const nextMod = { ...mod, id: 'new-highlight', title: 'New featured mod', description: 'A newly selected community release.',
+    const secondArtwork = `${artwork}#second-api`;
+    const nextMod = { ...mod, id: 'new-highlight', title: 'New featured mod', description: 'A newly selected community release.', image: secondArtwork,
       releaseTime: '2020-01-01T18:00:00Z', downloadAvailable: true };
     await selectApi(secondApi, { mod: nextMod });
     await waitFor(`${title} === 'New featured mod'`);
+    await waitFor(`document.querySelector('.community-highlight-artwork img')?.getAttribute('src') === ${JSON.stringify(secondArtwork)}`);
     assert.equal(await evaluate(metadataCount), 2);
+    assert.equal(await evaluate(artworkCount), 2);
     await selectApi(firstApi, { mod: { ...mod, title: 'This new server title must not replace the cached banner' } });
     await waitFor(`${title} === 'Clockwork Castle'`);
     assert.equal(await evaluate(metadataCount), 2);
+    assert.equal(await evaluate(artworkCount), 2);
     await focus();
     assert.equal(await evaluate(`document.querySelector('.community-highlight-description').textContent`), mod.description);
     assert.equal(await evaluate(`document.querySelector('.community-highlight-artwork img').getAttribute('src')`), artwork);
@@ -250,12 +290,31 @@ async function main() {
     const beforePending = await evaluate(metadataCount);
     await selectApi(secondApi, { metadataMode: 'ok', mod: nextMod });
     await waitFor(`${title} === 'New featured mod'`);
-    await evaluate(`window.__fixture.deferredMetadata.shift()({ status: 'ok', data: ${JSON.stringify(mod)} })`);
+    await evaluate(`window.__fixture.deferredMetadata.shift()({ status: 'ok', data: ${JSON.stringify({ ...mod, image: '' })} })`);
     await pause(100);
     assert.equal(await evaluate(title), 'New featured mod');
     assert.equal(await evaluate(metadataCount), beforePending);
     assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight [role="status"]'))`), false);
     results.push('A late metadata response from a previous API cannot replace the selected API banner.');
+
+    // Artwork is independent of metadata, including when its API selection expires.
+    const lateArtwork = `${artwork}#previous-api`;
+    await selectApi('https://pending-artwork-api.example.invalid', {
+      mod: { ...nextMod, id: 'pending-artwork', title: 'Artwork still loading', image: lateArtwork }, artworkMode: 'defer'
+    });
+    await waitFor(`${title} === 'Artwork still loading' && window.__fixture.deferredArtwork.length === 1`);
+    assert.equal(await evaluate(`document.querySelector('.community-highlight-description').textContent`), nextMod.description);
+    assert.equal(await evaluate(disabled), false);
+    assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight-artwork img'))`), false);
+    await selectApi(secondApi, { mod: nextMod, artworkMode: 'ok' });
+    await waitFor(`${title} === 'New featured mod' && document.querySelector('.community-highlight-artwork img')?.getAttribute('src') === ${JSON.stringify(secondArtwork)}`);
+    const beforeLateArtwork = await evaluate(artworkCount);
+    await evaluate(`window.__fixture.deferredArtwork.shift()({ status: 'ok', data: ${JSON.stringify(lateArtwork)} })`);
+    await pause(100);
+    assert.equal(await evaluate(title), 'New featured mod');
+    assert.equal(await evaluate(`document.querySelector('.community-highlight-artwork img').getAttribute('src')`), secondArtwork);
+    assert.equal(await evaluate(artworkCount), beforeLateArtwork);
+    results.push('Metadata and Download remain ready while artwork loads; a late artwork response cannot replace the selected API image.');
 
     // A completed download for a prior API cannot announce success for its replacement.
     await clickDownload();
@@ -265,7 +324,7 @@ async function main() {
     await evaluate(`window.__fixture.deferredDownload.shift()({ status: 'ok', data: { canceled: false, filePath: '/chosen-folder/previous-mod.ppf' } })`);
     await waitFor(`${disabled} === false`);
     assert.equal(await evaluate(`Boolean(document.querySelector('.community-highlight [role="status"]'))`), false);
-    assert.equal(await evaluate(metadataCount), beforePending);
+    assert.equal(await evaluate(metadataCount), beforePending + 1);
     results.push('Stale download feedback is ignored after changing API selections without refetching cached metadata.');
 
     await selectApi('https://broken-artwork-api.example.invalid', { mod: { ...nextMod, image: 'data:image/png;base64,broken-image' } });
@@ -299,9 +358,10 @@ async function main() {
       assert.equal(await evaluate(metadataCount), afterRequest);
     }
     assert.equal(await evaluate(`window.__metadataCalls.every(api => window.__metadataCalls.filter(value => value === api).length === 1)`), true);
+    assert.equal(await evaluate(`window.__artworkCalls.every(api => window.__artworkCalls.filter(value => value === api).length === 1)`), true);
     results.push('Missing and failed metadata are cached once per API and keep a quiet disabled placeholder across focus and API round trips.');
 
-    const result = { passed: true, checks: results, screenshots: [desktop, small] };
+    const result = { passed: true, checks: results, screenshots: [loading, desktop, small] };
     await fs.writeFile(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify({ ...result, output }, null, 2));
   } finally {
