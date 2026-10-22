@@ -16,7 +16,7 @@ const runtimeFiles = new Set([
   '/dist/community-client.js', '/dist/community-auth.js', '/dist/community-service.js', '/dist/community-types.js', '/dist/community-options.js', '/dist/community-presets.js', '/dist/option-writes.js',
   '/package.json', '/dist/main.js', '/dist/preload.js', '/dist/installed-presets.js', '/dist/options-database.js', '/dist/bundled-randomizer.js', '/dist/preset-generation.js', '/dist/randotools-export.js',
   '/dist/renderer/index.html', '/dist/renderer/styles.css', '/dist/renderer/renderer.js',
-  '/dist/renderer/template-options.js', '/dist/renderer/starting-relics.js', '/dist/renderer/item-initialization.js',
+  '/dist/renderer/template-options.js', '/dist/renderer/starting-relics.js', '/dist/renderer/item-initialization.js', '/dist/renderer/write-anchors.js',
   '/database/schema.sql', '/database/options-dump.sql', '/templates/preset-template.json',
   '/database/bundled-options-baseline.json',
   '/database/migrations/001-built-in-option-descriptions.sql',

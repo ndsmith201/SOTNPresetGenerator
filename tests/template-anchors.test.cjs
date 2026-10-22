@@ -20,7 +20,9 @@ const [bat, game, item, patch, main] = toPresetOptions([
   row(5, "Main block patch", [word("0x55667788", { address: "0x3000" })], { mainBlock: true })
 ]);
 const patchOnly = { writes: [word("0x12345678", { address: "0x1000", comment: "Existing patch" })] };
-const matches = (write, value) => write.type === "word" && Number(write.value) === value;
+const matches = (write, value) => write &&
+  (typeof write.value === "number" || (typeof write.value === "string" && write.value.trim() !== "")) &&
+  Number(write.value) === value;
 
 function generate(source, options = []) {
   const preset = createPresetFromTemplate("Template anchors", source, options);
@@ -138,19 +140,23 @@ test("inherited startup options also restore missing control-flow anchors withou
   }
 });
 
-test("the same jump instruction at a different address does not satisfy the startup hook", () => {
+test("an existing hook value is reused regardless of its address", () => {
   const source = structuredClone(template);
   source.writes[0].address = "0x2000";
   const original = structuredClone(source);
   const output = generate(source, [game]);
-  assertStartupScaffold(output);
-  assert.deepEqual(output.writes[0], template.writes[0]);
-  assert.ok(output.writes.some(write => matches(write, 0x0c04db00) && Number(write.address) === 0x2000));
+  assert.equal(output.writes.filter(write => matches(write, 0x0c04db00)).length, 1);
+  assert.deepEqual(output.writes[0], source.writes[0]);
+  const gameIndex = source.writes.findIndex(write => matches(write, 0x3c038004));
+  assert.deepEqual(output.writes, [
+    ...source.writes.slice(0, gameIndex + 1), ...game.gameInitWrites,
+    ...source.writes.slice(gameIndex + 1)
+  ]);
   assert.deepEqual(generate(output, [game]).writes, output.writes);
   assert.deepEqual(source, original);
 });
 
-test("an existing word at the hook address is repaired without a later overwrite", () => {
+test("conflicting writes at the hook target are repaired without adding another hook", () => {
   for (const earlierHook of [false, true]) {
     const source = { writes: [
       ...(earlierHook ? [structuredClone(template.writes[0])] : []),
@@ -163,22 +169,80 @@ test("an existing word at the hook address is repaired without a later overwrite
     const hooks = output.writes.filter((write, index) => locations[index].address === 0xfa97c);
     assert.equal(hooks.length, earlierHook ? 2 : 1);
     assert.ok(hooks.every(write => matches(write, 0x0c04db00)));
+    assert.equal(output.writes.filter(write => matches(write, 0x0c04db00)).length, earlierHook ? 2 : 1);
     assert.deepEqual(generate(output, [game]).writes, output.writes);
     assert.deepEqual(source, original);
   }
 });
 
-test("a return instruction at another patch address cannot satisfy the startup return", () => {
-  const unrelated = [word("0x0803924f", { address: "0x2000" }), word("0x00000000")];
-  const source = { writes: [...structuredClone(template.writes.slice(0, -2)), ...unrelated] };
+test("an existing return value is reused regardless of its address", () => {
+  const existingReturn = [word("0x0803924f", { address: "0x2000" }), word("0x00000000")];
+  const source = { writes: [...structuredClone(template.writes.slice(0, -2)), ...existingReturn] };
   const original = structuredClone(source);
   const output = generate(source, [game]);
-  const locations = writeLocations(output.writes);
-  const returns = output.writes.flatMap((write, index) => matches(write, 0x0803924f) && locations[index].startup ? [index] : []);
+  const returns = output.writes.flatMap((write, index) => matches(write, 0x0803924f) ? [index] : []);
   assert.equal(returns.length, 1);
   assert.ok(matches(output.writes[returns[0] + 1], 0));
-  assert.deepEqual(output.writes.slice(-2), unrelated);
+  assert.deepEqual(output.writes.slice(-2), existingReturn);
   assert.deepEqual(generate(output, [game]).writes, output.writes);
+  assert.deepEqual(source, original);
+});
+
+test("existing anchor values with mixed or missing types are reused for each write placement", () => {
+  const source = { writes: template.writes.map(({ type, ...write }, index) => ({
+    ...write, ...(index % 2 === 1 ? { type: "short" } : {})
+  })) };
+  const original = structuredClone(source);
+  const output = generate(source, [game, item, main]);
+  for (const value of [0x0c04db00, 0x37f70000, 0x36ff0000, 0x3c038004, 0x0803924f]) {
+    assert.equal(output.writes.filter(write => matches(write, value)).length, 1);
+    assert.deepEqual(output.writes.find(write => matches(write, value)), source.writes.find(write => matches(write, value)));
+  }
+  const range = itemInitializationRange(output.writes);
+  assert.ok(range);
+  assert.deepEqual(output.writes.slice(range.start + 1, range.end), item.itemInitWrites);
+  const gameIndex = output.writes.findIndex(write => matches(write, 0x3c038004));
+  assert.deepEqual(output.writes.slice(gameIndex + 1, gameIndex + 1 + game.gameInitWrites.length), game.gameInitWrites);
+  const returnIndex = output.writes.findIndex(write => matches(write, 0x0803924f));
+  assert.deepEqual(output.writes[returnIndex + 1], source.writes.at(-1));
+  assert.deepEqual(output.writes.slice(returnIndex + 2), main.mainBlockWrites);
+  assert.deepEqual(generate(output, [game, item, main]).writes, output.writes);
+  assert.deepEqual(source, original);
+});
+
+test("an implicit anchor keeps its target after an explicitly addressed custom startup prefix", () => {
+  const prefix = word("0x24040001", { address: "0x00158c98", comment: "Custom startup prefix" });
+  const source = { writes: [structuredClone(template.writes[0]), prefix, ...structuredClone(template.writes.slice(3))] };
+  const original = structuredClone(source);
+  const output = generate(source, [game]);
+  const prefixIndex = output.writes.findIndex(write => matches(write, 0x24040001));
+  const anchorIndex = output.writes.findIndex(write => matches(write, 0x34020003));
+  const gameIndex = output.writes.findIndex(write => matches(write, 0x3c038004));
+  const locations = writeLocations(output.writes);
+  assert.deepEqual(output.writes[prefixIndex], prefix);
+  assert.equal(locations[prefixIndex].address, 0x158c98);
+  assert.equal(output.writes[anchorIndex].address, undefined);
+  assert.equal(locations[anchorIndex].address, 0x158c9c);
+  assert.equal(locations.filter(location => location.address === 0x158c98).length, 1);
+  assert.deepEqual(output.writes.slice(gameIndex + 1, gameIndex + 1 + game.gameInitWrites.length), game.gameInitWrites);
+  assert.deepEqual(generate(output, [game]).writes, output.writes);
+  assert.deepEqual(source, original);
+});
+
+test("return comments with a different value do not satisfy the anchor or determine patch placement", () => {
+  const source = structuredClone(template);
+  const incorrect = { ...source.writes.at(-2), value: "0x34020009" };
+  source.writes[source.writes.length - 2] = incorrect;
+  const original = structuredClone(source);
+  const output = generate(source, [game, patch]);
+  const incorrectIndex = output.writes.findIndex(write => write.value === incorrect.value);
+  const patchIndex = output.writes.findIndex(write => write.value === patch.appendedWrites[0].value);
+  const returns = output.writes.flatMap((write, index) => matches(write, 0x0803924f) ? [index] : []);
+  assert.equal(returns.length, 1);
+  assert.ok(incorrectIndex >= 0 && incorrectIndex < patchIndex && patchIndex < returns[0]);
+  assert.deepEqual(output.writes[incorrectIndex], incorrect);
+  assert.ok(matches(output.writes[returns[0] + 1], 0));
+  assert.deepEqual(generate(output, [game, patch]).writes, output.writes);
   assert.deepEqual(source, original);
 });
 

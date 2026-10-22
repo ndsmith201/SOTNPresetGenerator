@@ -1,6 +1,7 @@
 import type { JsonObject, Preset, PresetOption, TemplateOptionMatch, WriteEntry } from "./types";
 import { detectStartingRelics } from "./starting-relics";
 import { itemInitializationRange } from "./item-initialization";
+import { hasAnchorValue } from "./write-anchors";
 
 function record(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -42,14 +43,14 @@ export function writeLocations(writes: WriteEntry[]): { address: number | undefi
       : ({ char: 1, short: 2, word: 4, long: 8 } as Record<string, number>)[String(write.type)];
     address = address === undefined || size === undefined ? undefined : address + size;
     if (delaySlot) startup = false;
-    if (startup && numeric(write.value) === numeric("0x0803924f")) delaySlot = true;
+    if (startup && hasAnchorValue(write, 0x0803924f)) delaySlot = true;
     return location;
   });
 }
 
 export function mainBlockStart(writes: WriteEntry[]): number | null {
-  const index = writes.findIndex((write, index) => write.type === "word" && Number(write.value) === 0x0803924f &&
-    writes[index + 1]?.type === "word" && Number(writes[index + 1].value) === 0);
+  const index = writes.findIndex((write, index) => hasAnchorValue(write, 0x0803924f) &&
+    hasAnchorValue(writes[index + 1], 0));
   return index < 0 ? null : index + 2;
 }
 

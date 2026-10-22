@@ -24,6 +24,7 @@ import { detectStartingRelics } from "./starting-relics";
 import { mainBlockStart, matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 import { ensureItemInitialization } from "./item-initialization";
 import { ensureInjectedCode } from "./injected-code";
+import { hasAnchorValue } from "./write-anchors";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -389,16 +390,11 @@ export function presetNameError(name: string, presets: readonly Pick<Preset, "id
 }
 
 function isReturnJump(write: WriteEntry): boolean {
-  const comment = typeof write.comment === "string" ? write.comment.toLowerCase() : "";
-  const value = typeof write.value === "string" ? write.value.toLowerCase() : "";
-  return (write.type === "word" && Number(write.value) === 0x0803924f) || value === "0x0803924f" || comment.includes("j 0x800e493c");
+  return hasAnchorValue(write, 0x0803924f);
 }
 
 function isGameInitAnchor(write: WriteEntry): boolean {
-  return (
-    write.type === "word" &&
-    Number(write.value) === 0x3c038004
-  );
+  return hasAnchorValue(write, 0x3c038004);
 }
 
 function removeEnabledRelicsFromLocks(preview: JsonObject, enabledRelics: Set<string>, customLockLocations: ReadonlySet<string>): void {
