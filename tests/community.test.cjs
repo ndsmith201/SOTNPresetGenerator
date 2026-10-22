@@ -20,6 +20,99 @@ function storage() {
   const values = new Map();
   return { values, read: key => values.get(key), write: (key, value) => value === null ? values.delete(key) : values.set(key, value), encrypt: text => Buffer.from(text).toString('base64'), decrypt: text => Buffer.from(text, 'base64').toString() };
 }
+function deferred() {
+  let resolve;
+  const promise = new Promise(complete => { resolve = complete; });
+  return { promise, resolve };
+}
+
+test('public catalog and health reads overlap each other and do not block status or configuration', { timeout: 5000 }, async t => {
+  const database = new DatabaseSync(':memory:'); t.after(() => database.close());
+  const allStarted = deferred();
+  const releaseReads = deferred();
+  t.after(() => releaseReads.resolve());
+  const calls = [];
+  const secondApi = 'https://another.example.com';
+  const service = new CommunityService({ database, storage: storage(), builds: new BuiltPresetStore(),
+    createOption() { throw new Error('Unexpected import'); }, loadOption() { throw new Error('Unexpected option'); },
+    fetcher: async (url, init) => {
+      calls.push(url);
+      assert.equal(init.method, 'GET');
+      assert.equal(new Headers(init.headers).has('authorization'), false);
+      if (!url.startsWith(secondApi)) {
+        if (calls.length === 3) allStarted.resolve();
+        await releaseReads.promise;
+      }
+      const route = new URL(url).pathname;
+      return response(route === '/healthz' ? { status: 'ok' } : route.endsWith(id) ? item() : { items: [item()] });
+    } });
+  const reads = [
+    service.request({ action: 'list', kind: 'options' }),
+    service.request({ action: 'get', kind: 'options', id }),
+    service.request({ action: 'health' })
+  ];
+  await allStarted.promise;
+  assert.equal((await service.request({ action: 'status' })).data.config.apiUrl, DEFAULT_COMMUNITY_CONFIG.apiUrl);
+  assert.equal((await service.request({ action: 'configure', config: { ...DEFAULT_COMMUNITY_CONFIG, apiUrl: secondApi } })).status, 'ok');
+  assert.equal((await service.request({ action: 'health' })).status, 'ok');
+  assert.equal((await service.request({ action: 'status' })).data.config.apiUrl, secondApi);
+  assert.ok(calls.slice(0, 3).every(url => url.startsWith(DEFAULT_COMMUNITY_CONFIG.apiUrl)));
+  assert.equal(calls.at(-1), `${secondApi}/healthz`);
+  releaseReads.resolve();
+  for (const result of await Promise.all(reads)) assert.equal(result.status, 'ok');
+});
+
+test('mutations and duplicate imports stay serialized across configuration changes', { timeout: 5000 }, async t => {
+  const database = new DatabaseSync(':memory:'); t.after(() => database.close());
+  const store = storage();
+  const firstApi = 'http://localhost:8080';
+  const secondApi = 'https://another.example.com';
+  store.write('config', JSON.stringify({ ...DEFAULT_COMMUNITY_CONFIG, apiUrl: firstApi, devUser: 'alice' }));
+  const voteStarted = deferred();
+  const voteResponse = deferred();
+  const importStarted = deferred();
+  const importResponse = deferred();
+  t.after(() => { voteResponse.resolve(response(item())); importResponse.resolve(response(item())); });
+  const calls = [];
+  const options = new Map();
+  let imports = 0;
+  let creates = 0;
+  const service = new CommunityService({ database, storage: store, builds: new BuiltPresetStore(),
+    createOption(input) { creates++; const option = { id: creates, ...input }; options.set(option.id, option); return option; },
+    loadOption(localId) { const option = options.get(localId); if (!option) throw new Error('Missing option'); return option; },
+    fetcher: async url => {
+      calls.push(url);
+      if (url.endsWith('/vote')) { voteStarted.resolve(); return voteResponse.promise; }
+      if (url.startsWith(firstApi) && ++imports === 1) { importStarted.resolve(); return importResponse.promise; }
+      return response(item());
+    } });
+  const vote = service.request({ action: 'vote', kind: 'options', id, value: 1 });
+  const firstImport = service.request({ action: 'importOption', kind: 'options', id });
+  const duplicateImport = service.request({ action: 'importOption', kind: 'options', id });
+  const configure = service.request({ action: 'configure', config: { ...DEFAULT_COMMUNITY_CONFIG, apiUrl: secondApi } });
+  const nextRead = service.request({ action: 'get', kind: 'options', id });
+  await voteStarted.promise;
+  await new Promise(setImmediate);
+  assert.deepEqual(calls, [`${firstApi}/v1/options/${id}/vote`]);
+  assert.equal(service.auth.config.apiUrl, firstApi);
+  voteResponse.resolve(response(item()));
+  await importStarted.promise;
+  await new Promise(setImmediate);
+  assert.equal(calls.length, 2);
+  assert.equal(service.auth.config.apiUrl, firstApi);
+  importResponse.resolve(response(item()));
+  assert.equal((await vote).status, 'ok');
+  assert.equal((await firstImport).data.alreadyImported, false);
+  assert.equal((await duplicateImport).data.alreadyImported, true);
+  assert.equal((await configure).status, 'ok');
+  assert.equal((await nextRead).status, 'ok');
+  assert.equal(creates, 1);
+  assert.equal(database.prepare('SELECT api_url FROM community_option_imports').get().api_url, firstApi);
+  assert.deepEqual(calls, [
+    `${firstApi}/v1/options/${id}/vote`, `${firstApi}/v1/options/${id}`,
+    `${firstApi}/v1/options/${id}`, `${secondApi}/v1/options/${id}`
+  ]);
+});
 
 test('community client exercises all nine OpenAPI operations against a local HTTP server', async t => {
   const requests = [];

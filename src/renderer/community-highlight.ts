@@ -16,9 +16,11 @@ export const COMMUNITY_HIGHLIGHT_PLACEHOLDER: CommunityHighlight = {
 };
 
 const MAX_RELEASE_TIMER_MS = 2 ** 31 - 1;
+interface CachedArtwork { promise: Promise<string>; image?: string }
 // Share the initial request across Strict Mode effects and library remounts.
 // The main process also caches it across renderer reloads for this app session.
 const sessionHighlights = new Map<string | undefined, Promise<CommunityFeaturedMod | null>>();
+const sessionArtwork = new Map<string | undefined, CachedArtwork>();
 function loadHighlight(apiUrl?: string): Promise<CommunityFeaturedMod | null> {
   let metadata = sessionHighlights.get(apiUrl);
   if (!metadata) {
@@ -28,12 +30,24 @@ function loadHighlight(apiUrl?: string): Promise<CommunityFeaturedMod | null> {
   return metadata;
 }
 
+function loadArtwork(apiUrl?: string) {
+  let artwork = sessionArtwork.get(apiUrl);
+  if (!artwork) {
+    const cached: CachedArtwork = { promise: communityRequest<string>({ action: "featuredArtwork", apiUrl }).catch(() => "") };
+    cached.promise = cached.promise.then(image => { cached.image = image; return image; });
+    sessionArtwork.set(apiUrl, cached);
+    artwork = cached;
+  }
+  return artwork;
+}
+
 function canDownload(mod: CommunityFeaturedMod | null, now = Date.now()): boolean {
   return Boolean(mod && (mod.downloadAvailable || Date.parse(mod.releaseTime) <= now));
 }
 
 export function useCommunityHighlight() {
   const [featuredMod, setFeaturedMod] = useState<CommunityFeaturedMod | null>(null);
+  const [artworkLoading, setArtworkLoading] = useState(false);
   const [releaseClock, setReleaseClock] = useState(Date.now);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
@@ -59,7 +73,19 @@ export function useCommunityHighlight() {
   const load = useCallback(async (nextApiUrl?: string) => {
     const current = ++requestVersion.current;
     const mod = await loadHighlight(nextApiUrl);
-    if (mounted.current && current === requestVersion.current) updateFeaturedMod(mod);
+    if (!mounted.current || current !== requestVersion.current) return;
+    if (!mod) {
+      updateFeaturedMod(null);
+      setArtworkLoading(false);
+      return;
+    }
+    const artwork = loadArtwork(nextApiUrl);
+    updateFeaturedMod({ ...mod, image: artwork.image ?? "" });
+    setArtworkLoading(artwork.image === undefined);
+    const image = await artwork.promise;
+    if (!mounted.current || current !== requestVersion.current) return;
+    updateFeaturedMod({ ...mod, image });
+    setArtworkLoading(false);
   }, [updateFeaturedMod]);
 
   useEffect(() => {
@@ -70,6 +96,7 @@ export function useCommunityHighlight() {
       apiUrl.current = nextApiUrl;
       selectionVersion.current++;
       updateFeaturedMod(null);
+      setArtworkLoading(false);
       void load(nextApiUrl);
     };
     const unsubscribe = subscribeCommunityStatus(status => selectApi(status.config.apiUrl));
@@ -138,6 +165,7 @@ export function useCommunityHighlight() {
 
   return {
     highlight: featuredMod ? { title: featuredMod.title, description: featuredMod.description, imageUrl: featuredMod.image } : COMMUNITY_HIGHLIGHT_PLACEHOLDER,
+    artworkLoading,
     downloadAvailable: canDownload(featuredMod, releaseClock),
     downloading,
     downloadError,

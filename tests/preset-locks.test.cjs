@@ -49,7 +49,7 @@ test("stat-edit options keep their UI category and follow all relic writes in th
     "Raise defense", "Stat follow-up", "lui v1, 0x8004", "After", "Regular patch"
   ]);
   assert.deepEqual(options, originalOptions);
-  const fallback = preview({ writes: [{ comment: "j 0x800e493c" }] }, options);
+  const fallback = preview({ writes: [{ value: "0x0803924f", comment: "j 0x800e493c" }] }, options);
   assert.deepEqual(fallback.writes.map((write) => write.comment), [
     "First relic", "Relic follow-up", "Second relic", "Raise strength", "Raise defense",
     "Stat follow-up", "Regular patch", "j 0x800e493c"

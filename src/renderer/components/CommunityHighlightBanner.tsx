@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 
 type CommunityHighlightBannerProps = {
   highlight: CommunityHighlight;
+  artworkLoading?: boolean;
   downloading: boolean;
   downloadError: string;
   onDownload: () => void;
@@ -12,11 +13,11 @@ type CommunityHighlightBannerProps = {
   downloadMessage?: string;
 };
 
-export function CommunityHighlightBanner({ highlight, downloading, downloadError, onDownload, downloadAvailable = false, downloadNote = "Download coming soon", downloadMessage = "" }: CommunityHighlightBannerProps) {
+export function CommunityHighlightBanner({ highlight, artworkLoading = false, downloading, downloadError, onDownload, downloadAvailable = false, downloadNote = "Download coming soon", downloadMessage = "" }: CommunityHighlightBannerProps) {
   const [imageError, setImageError] = useState(false);
   const downloadHelpId = useId();
   useEffect(() => setImageError(false), [highlight.imageUrl]);
-  const showArtwork = Boolean(highlight.imageUrl) && !imageError;
+  const showArtwork = artworkLoading || (Boolean(highlight.imageUrl) && !imageError);
 
   return <section className={`community-highlight${showArtwork ? "" : " community-highlight-without-artwork"}`} aria-label="Community highlight">
     <div className="community-highlight-copy">
@@ -34,7 +35,9 @@ export function CommunityHighlightBanner({ highlight, downloading, downloadError
       {downloadError && <p className="community-highlight-error" role="alert">{downloadError}</p>}
     </div>
     {showArtwork && <div className="community-highlight-artwork">
-      <img key={highlight.imageUrl} src={highlight.imageUrl} alt={`${highlight.title} artwork`} onError={() => setImageError(true)} />
+      {highlight.imageUrl && !imageError
+        ? <img key={highlight.imageUrl} src={highlight.imageUrl} alt={`${highlight.title} artwork`} onError={() => setImageError(true)} />
+        : <div className="community-highlight-artwork-placeholder" aria-hidden="true" />}
     </div>}
   </section>;
 }

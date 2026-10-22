@@ -43,6 +43,7 @@ export type CommunityRequest =
   | { action: "account"; account: AccountRequest }
   | { action: "health" }
   | { action: "featuredMod"; apiUrl?: string }
+  | { action: "featuredArtwork"; apiUrl?: string }
   | { action: "downloadFeaturedMod"; id: string; title: string }
   | { action: "list"; kind: CatalogKind; cursor?: string }
   | { action: "get" | "importOption"; kind: CatalogKind; id: string }

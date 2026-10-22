@@ -23,6 +23,8 @@ import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
 import { mainBlockStart, matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 import { ensureItemInitialization } from "./item-initialization";
+import { ensureInjectedCode, ensureRelicInitialization } from "./injected-code";
+import { hasAnchorValue } from "./write-anchors";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
   "Enable Soul of Bat",
@@ -73,22 +75,29 @@ function getEnabledRelics(selected: PresetOption[], template: JsonObject | null 
 export function calculateMaxComplexity(
   template: JsonObject | null,
   selected: PresetOption[] = [],
-  extension: MetaExtension = DEFAULT_META_EXTENSION
+  extension: MetaExtension = DEFAULT_META_EXTENSION,
+  customLockLocations: ReadonlySet<string> = new Set()
 ): number {
   let locations = template?.lockLocation;
   let complexityGoal = template?.complexityGoal;
   for (const option of selected) {
-    if (option.previewJson && Object.hasOwn(option.previewJson, "lockLocation")) locations = option.previewJson.lockLocation;
+    if (option.previewJson && Object.hasOwn(option.previewJson, "lockLocation")) {
+      locations = option.previewJson.lockLocation;
+      customLockLocations = new Set();
+    }
     if (option.previewJson && Object.hasOwn(option.previewJson, "complexityGoal")) complexityGoal = option.previewJson.complexityGoal;
   }
   if (!Array.isArray(locations)) return 0;
   const allowedLocations = new Set(RELIC_LOCATION_CHECKS[normalizeMetaExtension(extension)]);
-  const routes: string[][][] = [];
+  const routes: { alternatives: string[][]; custom: boolean }[] = [];
   for (const location of locations) {
     if (!isJsonObject(location) || typeof location.location !== "string" || !allowedLocations.has(location.location)) continue;
     if (Array.isArray(location.locks)) {
-      routes.push(location.locks.filter((lock): lock is string => typeof lock === "string")
-        .map((lock) => lock.split("+").map((relic) => relic.trim()).filter(Boolean)));
+      routes.push({
+        alternatives: location.locks.filter((lock): lock is string => typeof lock === "string")
+          .map((lock) => lock.split("+").map((relic) => relic.trim()).filter(Boolean)),
+        custom: customLockLocations.has(location.location)
+      });
     }
   }
   const enabled = getEnabledRelics(selected, template);
@@ -98,7 +107,7 @@ export function calculateMaxComplexity(
   // Count that terminal step once, not once for each missing Vlad relic.
   const finalVladStep = goals.length > 0 && goals.every((goal) => goal.split("+")
     .some((requirement) => VLAD_RELICS.has(requirement.trim()) && !enabled.has(requirement.trim())));
-  const requiredRelics = routes.flat(2);
+  const requiredRelics = routes.flatMap(({ alternatives }) => alternatives.flat());
   const movementRelics = FLIGHT_SATISFIED_REQUIREMENTS.flat();
   const usesMovement = requiredRelics.some((relic) => movementRelics.includes(relic));
   const relics = [...new Set([...requiredRelics, ...(usesMovement ? movementRelics : [])])];
@@ -107,13 +116,16 @@ export function calculateMaxComplexity(
   const flightMasks = usesMovement ? FLIGHT_METHODS.map(mask) : [];
   const jumpMask = mask(["Leap Stone", "Gravity Boots"]);
   const methods = FLIGHT_SATISFIED_REQUIREMENTS.map((names) => ({ names, mask: mask(names) }));
-  const checkRoutes = routes.map((alternatives) => {
+  const checkRoutes = routes.map(({ alternatives, custom }) => {
     // If every route needs Mist and some use another movement method, Mist
     // serves as entry as well as flight (for example, Soul of Bat's location).
     const mistEntry = alternatives.length > 0 && alternatives.every((route) => route.includes("Form of Mist")) &&
       alternatives.some((route) => !route.includes("Power of Mist"));
     return alternatives.map((requirements) => {
       const required = mask(requirements);
+      // A modded castle's source rules may give movement relics a different
+      // purpose. Only actual starting inventory satisfies those requirements.
+      if (custom) return { required, withFlight: required };
       let withFlight = required & ~jumpMask;
       for (const method of methods) {
         // Bat still has a distinct use with Echo; standalone Mist is a barrier.
@@ -210,9 +222,9 @@ export function createPresetFromTemplate(name: string, source?: JsonObject, opti
 
 export function calculatePresetMaxComplexity(template: JsonObject | null, preset: Preset | null, options: PresetOption[]): number {
   if (!preset) return 0;
-  const source = presetTemplate(template, preset);
+  const resolved = resolvePresetTemplate(template, preset);
   const selected = options.filter((option) => preset.optionIds.includes(option.id));
-  return calculateMaxComplexity(source, selected, preset.metaExtension);
+  return calculateMaxComplexity(resolved?.source ?? null, selected, preset.metaExtension, resolved?.customLockLocations);
 }
 
 export function hasPresetEdits(template: JsonObject, preset: Preset, options: PresetOption[], complexity: number, maximumComplexity: number): boolean {
@@ -233,13 +245,37 @@ export function hasPresetEdits(template: JsonObject, preset: Preset, options: Pr
     || complexity !== normalizeComplexity(templateComplexity(original), maximumComplexity);
 }
 
-function presetTemplate(template: JsonObject | null, preset: Preset): JsonObject | null {
+function resolvePresetTemplate(template: JsonObject | null, preset: Preset): {
+  source: JsonObject;
+  customLockLocations: ReadonlySet<string>;
+} | null {
   if (!template) return null;
-  if (!preset.baseTemplate) return template;
-  // Keep installed settings, but use the bundled access rules for every
-  // extension. Preview generation clones and filters these before editing them.
+  const customLockLocations = new Set<string>();
+  if (!preset.baseTemplate) return { source: template, customLockLocations };
   const { inherits: _inherits, ...source } = templateWithOptionSelections(preset)!;
-  return { ...source, lockLocation: template.lockLocation ?? [] };
+  const metadata = isJsonObject(source.metadata) ? source.metadata : {};
+  if (typeof metadata.castleType !== "string" || metadata.castleType.trim().toLowerCase() !== "modded") {
+    return { source: { ...source, lockLocation: template.lockLocation ?? [] }, customLockLocations };
+  }
+  // Fill the selected extension from bundled rules, then let complete source
+  // entries override matching locations. Rebuild from the saved source so
+  // changing extensions never discards the original castle's rules.
+  const allowedLocations = new Set(RELIC_LOCATION_CHECKS[normalizeMetaExtension(preset.metaExtension)]);
+  const locations = new Map<string, JsonObject>();
+  const bundledLocks = Array.isArray(template.lockLocation) ? template.lockLocation : [];
+  const sourceLocks = Array.isArray(source.lockLocation) ? source.lockLocation : [];
+  for (const entry of bundledLocks) {
+    if (isJsonObject(entry) && typeof entry.location === "string" && allowedLocations.has(entry.location)) {
+      locations.set(entry.location, entry);
+    }
+  }
+  for (const entry of sourceLocks) {
+    if (isJsonObject(entry) && typeof entry.location === "string" && allowedLocations.has(entry.location)) {
+      locations.set(entry.location, entry);
+      customLockLocations.add(entry.location);
+    }
+  }
+  return { source: { ...source, lockLocation: [...locations.values()] }, customLockLocations };
 }
 
 function isPreset(value: unknown): value is Preset {
@@ -354,19 +390,14 @@ export function presetNameError(name: string, presets: readonly Pick<Preset, "id
 }
 
 function isReturnJump(write: WriteEntry): boolean {
-  const comment = typeof write.comment === "string" ? write.comment.toLowerCase() : "";
-  const value = typeof write.value === "string" ? write.value.toLowerCase() : "";
-  return (write.type === "word" && Number(write.value) === 0x0803924f) || value === "0x0803924f" || comment.includes("j 0x800e493c");
+  return hasAnchorValue(write, 0x0803924f);
 }
 
 function isGameInitAnchor(write: WriteEntry): boolean {
-  return (
-    write.type === "word" &&
-    Number(write.value) === 0x3c038004
-  );
+  return hasAnchorValue(write, 0x3c038004);
 }
 
-function removeEnabledRelicsFromLocks(preview: JsonObject, enabledRelics: Set<string>): void {
+function removeEnabledRelicsFromLocks(preview: JsonObject, enabledRelics: Set<string>, customLockLocations: ReadonlySet<string>): void {
   if (!enabledRelics.size || !Array.isArray(preview.lockLocation)) return;
   const enabledFlightMethods = FLIGHT_METHODS.filter((method) => method.every((relic) => enabledRelics.has(relic)));
   const hasFlight = enabledFlightMethods.length > 0;
@@ -383,6 +414,16 @@ function removeEnabledRelicsFromLocks(preview: JsonObject, enabledRelics: Set<st
       location.escapeRequires = [];
     }
     if (!Array.isArray(location.locks)) continue;
+    if (typeof location.location === "string" && customLockLocations.has(location.location)) {
+      const locks = location.locks.map((lock: unknown) => {
+        if (typeof lock !== "string") return lock;
+        const requirements = lock.split("+").map((relic) => relic.trim());
+        const remaining = requirements.filter((relic) => !enabledRelics.has(relic));
+        return remaining.length === requirements.length ? lock : remaining.join(" + ");
+      });
+      location.locks = locks.includes("") ? [] : [...new Set(locks)];
+      continue;
+    }
     // Rib of Vlad's jump routes need a transformation as well as height.
     // Use the enabled movement route, rather than substituting it for Bat.
     const useEnabledVladRoute = hasFlight && location.location === "Rib of Vlad" && !enabledRelics.has("Form of Mist");
@@ -453,8 +494,9 @@ export function buildPreviewPreset(
   maximumComplexity?: number
 ): JsonObject | null {
   if (!preset) return null;
-  const source = presetTemplate(template, preset);
-  if (!source) return null;
+  const resolved = resolvePresetTemplate(template, preset);
+  if (!resolved) return null;
+  const { source } = resolved;
   const preview = structuredClone(source);
   const extension = normalizeMetaExtension(preset.metaExtension);
   const selected = options.filter((option) => preset.optionIds.includes(option.id));
@@ -500,6 +542,9 @@ export function buildPreviewPreset(
   const templateWrites = Array.isArray(sourceWrites)
     ? sourceWrites.filter(isJsonObject).map((write) => structuredClone(write))
     : [];
+  const needsInjectedCode = selected.some(option => option.injectedWrites.length > 0 ||
+    option.gameInitWrites.length > 0 || (option.itemInitWrites?.length ?? 0) > 0);
+  if (preset.baseTemplate && needsInjectedCode) ensureInjectedCode(templateWrites);
   const itemInit = additions.flatMap(option => structuredClone(option.itemInitWrites ?? []));
   if (itemInit.length > 0) {
     const { start, end } = ensureItemInitialization(templateWrites);
@@ -538,12 +583,17 @@ export function buildPreviewPreset(
       type: "word", value: "0x3c038004", comment: "lui v1, 0x8004"
     });
   }
+  let injectionIndex = gameInitAnchorIndex >= 0 ? gameInitAnchorIndex
+    : returnIndex < 0 ? templateWrites.length : returnIndex;
+  if (preset.baseTemplate && injected.length > 0) {
+    injectionIndex = ensureRelicInitialization(templateWrites, injectionIndex);
+  }
   if (gameInitAnchorIndex >= 0) {
-    templateWrites.splice(gameInitAnchorIndex, 0, ...injected);
-    const shiftedAnchorIndex = gameInitAnchorIndex + injected.length;
+    templateWrites.splice(injectionIndex, 0, ...injected);
+    const shiftedAnchorIndex = injectionIndex + injected.length;
     templateWrites.splice(shiftedAnchorIndex + 1, 0, ...gameInit);
   } else {
-    templateWrites.splice(returnIndex < 0 ? templateWrites.length : returnIndex, 0, ...injected, ...gameInit);
+    templateWrites.splice(injectionIndex, 0, ...injected, ...gameInit);
   }
   // Default patches precede the return jump and keep its delay slot intact.
   const finalReturnIndex = templateWrites.findIndex(isReturnJump);
@@ -600,7 +650,9 @@ export function buildPreviewPreset(
       isJsonObject(entry) && typeof entry.location === "string" && allowedLocations.has(entry.location)
     );
   }
-  removeEnabledRelicsFromLocks(merged, enabledRelics);
+  const customLockLocations = additions.some((option) => option.previewJson && Object.hasOwn(option.previewJson, "lockLocation"))
+    ? new Set<string>() : resolved.customLockLocations;
+  removeEnabledRelicsFromLocks(merged, enabledRelics, customLockLocations);
   return merged;
 }
 

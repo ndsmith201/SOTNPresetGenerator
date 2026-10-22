@@ -25,7 +25,7 @@ test("starting relic options are preselected with their original writes exactly 
   const preset = createPresetFromTemplate("Copy", source, [bat, scroll]);
   assert.deepEqual(preset.optionIds, [bat.id, scroll.id]);
   const output = buildPreviewPreset(template, preset, [bat, scroll]);
-  assert.deepEqual(output.writes, source.writes);
+  assert.deepEqual(output.writes, [template.writes[0], ...source.writes]);
   assert.equal(calculatePresetMaxComplexity(template, preset, [bat, scroll]), 8);
   assert.deepEqual(source, original);
 });
@@ -36,10 +36,10 @@ test("unchecking a matched relic removes its grant and updates locks and metadat
   const output = buildPreviewPreset(template, unchecked, [bat, scroll]);
   assert.deepEqual([...detectStartingRelics(output)], ["Faerie Scroll"]);
   assert.equal(output.metadata.transformEarly, false);
-  assert.equal(output.writes.length, source.writes.length);
-  assert.equal(output.writes[4].value, "0x00000000");
+  assert.equal(output.writes.length, source.writes.length + 1);
+  assert.equal(output.writes[5].value, "0x00000000");
   assert.ok(calculatePresetMaxComplexity(template, unchecked, [bat, scroll]) > 8);
-  assert.deepEqual(buildPreviewPreset(template, preset, [bat, scroll]).writes, source.writes);
+  assert.deepEqual(buildPreviewPreset(template, preset, [bat, scroll]).writes, [template.writes[0], ...source.writes]);
 });
 
 test("complete addressed write groups match normalized values and inferred addresses, but partial or wrong-address groups do not", () => {
@@ -105,5 +105,5 @@ test("legacy drafts match once and persist deselections across reload", () => {
 test("overlapping matched writes remain while any selected option still needs them", () => {
   const duplicate = { ...bat, id: "another-bat" };
   const preset = createPresetFromTemplate("Overlap", source, [bat, duplicate]);
-  assert.deepEqual(buildPreviewPreset(template, { ...preset, optionIds: [bat.id] }, [bat, duplicate]).writes, source.writes);
+  assert.deepEqual(buildPreviewPreset(template, { ...preset, optionIds: [bat.id] }, [bat, duplicate]).writes, [template.writes[0], ...source.writes]);
 });

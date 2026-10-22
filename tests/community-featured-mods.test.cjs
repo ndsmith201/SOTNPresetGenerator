@@ -50,6 +50,11 @@ function assertPublic(init) {
   assert.equal(headers.has('x-dev-user'), false);
   assert.equal(init.body, undefined);
 }
+function deferred() {
+  let resolve;
+  const promise = new Promise(complete => { resolve = complete; });
+  return { promise, resolve };
+}
 
 test('featured metadata is a public request independent of PPF download and release availability', async () => {
   const calls = [];
@@ -233,8 +238,9 @@ test('featured service fetches and saves the separate PPF without requiring a si
     },
     saveFeaturedMod: async (name, download) => { saves.push({ name, bytes: await download() }); return { canceled: false, filePath: '/chosen/Castle Remix.ppf' }; }
   });
-  assert.deepEqual(await app.request({ action: 'featuredMod' }), { status: 'ok', data: { ...featured, image: artworkDataUrl } });
+  assert.deepEqual(await app.request({ action: 'featuredMod' }), { status: 'ok', data: { ...featured, image: '' } });
   assert.equal(saves.length, 0);
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: artworkDataUrl });
   assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, featured.image]);
   assert.deepEqual(await app.request({ action: 'downloadFeaturedMod', id, title: featured.title }), { status: 'ok', data: { canceled: false, filePath: '/chosen/Castle Remix.ppf' } });
   assert.equal(saves[0].name, 'Castle Remix.ppf');
@@ -260,9 +266,11 @@ test('featured service shares one metadata and artwork load across concurrent ca
   const first = app.request({ action: 'featuredMod' });
   const concurrent = app.request({ action: 'featuredMod' });
   releaseMetadata(json(featured));
-  const expected = { status: 'ok', data: { ...featured, image: artworkDataUrl } };
+  const expected = { status: 'ok', data: { ...featured, image: '' } };
   assert.deepEqual(await first, expected);
   assert.deepEqual(await concurrent, expected);
+  const artworkResults = await Promise.all([app.request({ action: 'featuredArtwork' }), app.request({ action: 'featuredArtwork' })]);
+  assert.deepEqual(artworkResults, [{ status: 'ok', data: artworkDataUrl }, { status: 'ok', data: artworkDataUrl }]);
   await app.request({ action: 'status' });
   for (let i = 0; i < 2; i++) {
     const failedDownload = await app.request({ action: 'downloadFeaturedMod', id, title: featured.title });
@@ -272,6 +280,57 @@ test('featured service shares one metadata and artwork load across concurrent ca
   }
   assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, featured.image, `${apiUrl}${route}`, `${apiUrl}${route}`]);
   assert.equal(expected.data.downloadAvailable, false);
+});
+
+test('featured metadata and status resolve while eagerly cached artwork is still downloading', { timeout: 5000 }, async t => {
+  const artworkStarted = deferred();
+  const artworkResponse = deferred();
+  t.after(() => artworkResponse.resolve(imageResponse()));
+  const featured = mod();
+  const calls = [];
+  const app = service(t, { fetcher: async (url, init) => {
+    calls.push(url); assertPublic(init);
+    if (url === featured.image) { artworkStarted.resolve(); return artworkResponse.promise; }
+    return json(featured);
+  } });
+  const expected = { status: 'ok', data: { ...featured, image: '' } };
+  assert.deepEqual(await app.request({ action: 'featuredMod' }), expected);
+  await artworkStarted.promise;
+  let artworkFinished = false;
+  const artworkResult = app.request({ action: 'featuredArtwork' }).then(result => { artworkFinished = true; return result; });
+  assert.equal((await app.request({ action: 'status' })).status, 'ok');
+  assert.deepEqual(await app.request({ action: 'featuredMod' }), expected);
+  assert.equal(artworkFinished, false);
+  artworkResponse.resolve(imageResponse());
+  assert.deepEqual(await artworkResult, { status: 'ok', data: artworkDataUrl });
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: artworkDataUrl });
+  assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, featured.image]);
+});
+
+test('featured artwork remains tied to its original API while configuration changes', { timeout: 5000 }, async t => {
+  const secondApi = 'https://second-api.example.invalid';
+  const firstImage = mod().image;
+  const secondImage = 'https://featured-mods.s3.us-east-1.amazonaws.com/second.png';
+  const firstArtwork = deferred();
+  const firstStarted = deferred();
+  t.after(() => firstArtwork.resolve(imageResponse()));
+  const calls = [];
+  const app = service(t, { fetcher: async (url, init) => {
+    calls.push(url); assertPublic(init);
+    if (url === firstImage) { firstStarted.resolve(); return firstArtwork.promise; }
+    if (url === secondImage) return imageResponse();
+    return json(mod({ title: url.startsWith(secondApi) ? 'Second API mod' : 'First API mod', image: url.startsWith(secondApi) ? secondImage : firstImage }));
+  } });
+  assert.equal((await app.request({ action: 'featuredMod' })).data.title, 'First API mod');
+  await firstStarted.promise;
+  const pendingArtwork = app.request({ action: 'featuredArtwork', apiUrl });
+  assert.equal((await app.request({ action: 'configure', config: { ...DEFAULT_COMMUNITY_CONFIG, apiUrl: secondApi } })).status, 'ok');
+  assert.equal((await app.request({ action: 'featuredMod' })).data.title, 'Second API mod');
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: artworkDataUrl });
+  firstArtwork.resolve(imageResponse());
+  assert.deepEqual(await pendingArtwork, { status: 'ok', data: artworkDataUrl });
+  assert.deepEqual(await app.request({ action: 'featuredArtwork', apiUrl: `${apiUrl}/` }), { status: 'ok', data: artworkDataUrl });
+  assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, firstImage, `${secondApi}/v1/featured-mods`, secondImage]);
 });
 
 test('featured cache is per normalized API, reuses prior APIs, and honors the renderer API snapshot', async t => {
@@ -284,6 +343,7 @@ test('featured cache is per normalized API, reuses prior APIs, and honors the re
   } });
   const first = await app.request({ action: 'featuredMod' });
   assert.equal(first.data.title, 'First API mod');
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: artworkDataUrl });
   const configure = async config => {
     assert.equal((await app.request({ action: 'configure', config: { ...DEFAULT_COMMUNITY_CONFIG, ...config } })).status, 'ok');
   };
@@ -292,12 +352,15 @@ test('featured cache is per normalized API, reuses prior APIs, and honors the re
   assert.deepEqual(await app.request({ action: 'featuredMod', apiUrl: `${apiUrl}/` }), first);
   const second = await app.request({ action: 'featuredMod', apiUrl: secondApi });
   assert.equal(second.data.title, 'Second API mod');
+  assert.deepEqual(await app.request({ action: 'featuredArtwork', apiUrl: secondApi }), { status: 'ok', data: artworkDataUrl });
+  assert.deepEqual(await app.request({ action: 'featuredArtwork', apiUrl: `${apiUrl}/` }), { status: 'ok', data: artworkDataUrl });
   await configure({ apiUrl: `${apiUrl}/`, clientId: 'differentclient' });
   assert.deepEqual(await app.request({ action: 'featuredMod' }), first);
   await configure({ apiUrl: secondApi });
   assert.deepEqual(await app.request({ action: 'featuredMod' }), second);
   assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, mod().image, `${secondApi}/v1/featured-mods`, mod().image]);
   assert.equal((await app.request({ action: 'featuredMod', apiUrl: 'file:///tmp/mod' })).status, 'error');
+  assert.equal((await app.request({ action: 'featuredArtwork', apiUrl: 'file:///tmp/mod' })).status, 'error');
   assert.equal(calls.length, 4);
 });
 
@@ -315,8 +378,10 @@ test('missing and failed featured metadata stay cached for the app session and r
     const result = await app.request({ action: 'featuredMod' });
     assert.equal(result.status, outcome === 'missing' ? 'ok' : 'error');
     if (outcome === 'missing') assert.equal(result.data, null);
+    assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: '' });
     hasRecovered = true;
     assert.deepEqual(await app.request({ action: 'featuredMod' }), result);
+    assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: '' });
     await app.request({ action: 'configure', config: { ...DEFAULT_COMMUNITY_CONFIG, apiUrl: 'https://other-api.example.invalid' } });
     assert.deepEqual(await app.request({ action: 'featuredMod' }), { status: 'ok', data: null });
     await app.request({ action: 'configure', config: DEFAULT_COMMUNITY_CONFIG });
@@ -338,6 +403,8 @@ test('unavailable featured artwork preserves metadata and avoids later image or 
   const expected = { status: 'ok', data: { ...featured, image: '' } };
   assert.deepEqual(await app.request({ action: 'featuredMod' }), expected);
   assert.deepEqual(await app.request({ action: 'featuredMod' }), expected);
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: '' });
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: '' });
   assert.deepEqual(calls, [`${apiUrl}/v1/featured-mods`, featured.image]);
 });
 
@@ -390,4 +457,27 @@ test('public featured request 401 errors do not discard an existing community se
     assert.equal((await app.request({ action: 'status' })).data.signedIn, true);
     assert.equal(store.read('session'), session);
   }
+  assert.deepEqual(await app.request({ action: 'featuredArtwork' }), { status: 'ok', data: '' });
+  assert.equal((await app.request({ action: 'status' })).data.signedIn, true);
+  assert.equal(store.read('session'), session);
+});
+
+test('unauthorized artwork is cached as unavailable without signing out or exposing its source URL', async t => {
+  const store = storage();
+  const calls = [];
+  const featured = mod();
+  const app = service(t, { storage: store, fetcher: async (url, init) => {
+    calls.push(url);
+    if (url.includes('cognito-idp')) return json({ AuthenticationResult: { AccessToken: 'access-token', RefreshToken: 'refresh-token', ExpiresIn: 3600 } });
+    assertPublic(init);
+    return url === featured.image ? json({ message: 'Unauthorized artwork' }, 401) : json(featured);
+  } });
+  await app.request({ action: 'account', account: { action: 'signIn', email: 'runner@example.com', password: 'example' } });
+  const session = store.read('session');
+  assert.deepEqual(await app.request({ action: 'featuredMod' }), { status: 'ok', data: { ...featured, image: '' } });
+  for (let i = 0; i < 2; i++) assert.deepEqual(await app.request({ action: 'featuredArtwork', imageUrl: 'https://example.com/untrusted.png' }), { status: 'ok', data: '' });
+  assert.equal((await app.request({ action: 'status' })).data.signedIn, true);
+  assert.equal(store.read('session'), session);
+  assert.equal(calls.filter(url => url === featured.image).length, 1);
+  assert.equal(calls.some(url => url.includes('untrusted.png')), false);
 });

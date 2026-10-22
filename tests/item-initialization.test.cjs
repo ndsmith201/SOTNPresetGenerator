@@ -67,8 +67,9 @@ test('numeric and commentless anchors work and item matching is restricted to th
   const draft = createPresetFromTemplate('Items', source, catalog);
   assert.deepEqual(draft.optionIds, []);
   const output = generate(source, catalog);
-  assert.deepEqual(output.writes.slice(1, 4), items);
-  assert.equal(output.writes[4].value, 0x36ff0000);
+  const range = itemInitializationRange(output.writes);
+  assert.deepEqual(output.writes.slice(range.start + 1, range.end), items);
+  assert.equal(output.writes[range.end].value, 0x36ff0000);
   assert.deepEqual(generate(output, catalog).writes, output.writes);
 });
 
