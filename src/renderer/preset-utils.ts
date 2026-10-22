@@ -23,7 +23,7 @@ import { RELIC_LOCATION_CHECKS } from "./relic-location-checks";
 import { detectStartingRelics } from "./starting-relics";
 import { mainBlockStart, matchTemplateOptions, selectTemplateOptions, templateWithOptionSelections, writeLocations } from "./template-options";
 import { ensureItemInitialization } from "./item-initialization";
-import { ensureInjectedCode } from "./injected-code";
+import { ensureInjectedCode, ensureRelicInitialization } from "./injected-code";
 import { hasAnchorValue } from "./write-anchors";
 
 const EARLY_TRANSFORM_OPTION_LABELS = new Set([
@@ -583,12 +583,17 @@ export function buildPreviewPreset(
       type: "word", value: "0x3c038004", comment: "lui v1, 0x8004"
     });
   }
+  let injectionIndex = gameInitAnchorIndex >= 0 ? gameInitAnchorIndex
+    : returnIndex < 0 ? templateWrites.length : returnIndex;
+  if (preset.baseTemplate && injected.length > 0) {
+    injectionIndex = ensureRelicInitialization(templateWrites, injectionIndex);
+  }
   if (gameInitAnchorIndex >= 0) {
-    templateWrites.splice(gameInitAnchorIndex, 0, ...injected);
-    const shiftedAnchorIndex = gameInitAnchorIndex + injected.length;
+    templateWrites.splice(injectionIndex, 0, ...injected);
+    const shiftedAnchorIndex = injectionIndex + injected.length;
     templateWrites.splice(shiftedAnchorIndex + 1, 0, ...gameInit);
   } else {
-    templateWrites.splice(returnIndex < 0 ? templateWrites.length : returnIndex, 0, ...injected, ...gameInit);
+    templateWrites.splice(injectionIndex, 0, ...injected, ...gameInit);
   }
   // Default patches precede the return jump and keep its delay slot intact.
   const finalReturnIndex = templateWrites.findIndex(isReturnJump);

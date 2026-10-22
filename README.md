@@ -102,7 +102,7 @@ A draft created from an installed preset stores its own copy of the source JSON,
 
 If the source has no writes or an empty writes array, the generated copy starts with the default template's writes before applying selected options.
 
-When selected options need injected startup code, the generated copy also adds a missing jump into that code and repairs the return jump and its following no-op independently. Missing item initialization and game initialization anchors are added when those placements need them. Existing anchors are reused, and ordinary patches do not add an unused startup routine.
+When selected options need injected startup code, the generated copy also adds a missing jump into that code and repairs the return jump and its following no-op independently. Missing item initialization, relic initialization, and game initialization anchors are checked individually and added when those placements need them. Relic writes receive both the owned-and-active value and relic-memory setup before insertion, even when the template already has a game initialization anchor. Existing anchors are reused, and ordinary patches do not add an unused startup routine.
 
 Anchor existence and write placement match only the anchor's `value`, treating equivalent numeric and numeric-string values alike regardless of hexadecimal case or padding. Comments, reasons, write types, and addresses do not identify anchors. Section ordering still applies: item writes go between save and recall, game initialization precedes the return, and main-block writes follow the return and its immediately following no-op.
 

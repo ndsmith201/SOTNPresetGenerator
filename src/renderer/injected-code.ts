@@ -13,6 +13,22 @@ const startup = [
   { type: "word", value: "0x3c038004", comment: "lui v1, 0x8004" }
 ];
 
+/** Restore each missing relic setup instruction before the insertion point. */
+export function ensureRelicInitialization(writes: WriteEntry[], index: number): number {
+  const missing: WriteEntry[] = startup.slice(2, 4)
+    .filter(anchor => !writes.some((write, position) => position < index && hasAnchorValue(write, Number(anchor.value))))
+    .map(anchor => ({ ...anchor }));
+  if (missing.length === 0) return index;
+  // The new setup must execute at the original boundary, with the existing
+  // instruction continuing after it instead of resetting the write cursor.
+  if (writes[index]?.address !== undefined) {
+    missing[0].address = writes[index].address;
+    delete writes[index].address;
+  }
+  writes.splice(index, 0, ...missing);
+  return index + missing.length;
+}
+
 function hasDelaySlot(write: WriteEntry | undefined): boolean {
   if (write?.type !== "word") return false;
   const instruction = Number(write.value);
