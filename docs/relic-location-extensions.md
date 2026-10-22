@@ -6,6 +6,8 @@ These are full check lists, including inherited locations, not just each extensi
 
 The reusable export is `RELIC_LOCATION_CHECKS` in `src/renderer/relic-location-checks.ts`, keyed by the app's six `MetaExtension` values. Preview and export filter the template's checks by the selected extension, then apply starting-relic lock adjustments. Each rebuild starts from the original template. Raw JSON lock overrides are filtered too; they cannot change the selected extension. Complexity uses all checks in the selected extension, including allowed checks after Trio, and recalculates when the extension changes.
 
+When copying a preset whose `metadata.castleType` is `Modded` (case-insensitive), the selected extension supplies the bundled default checks, and matching source `lockLocation` entries replace those defaults in full. This preserves custom locks, escape requirements, and other entry fields. Source locations outside the selected extension are omitted from the generated copy; switching back restores them from the unchanged source. Missing source locations use the bundled rules. Starting relics satisfy explicitly named requirements in these custom entries without applying normal-castle flight shortcuts; bundled fallback entries retain their usual adjustments. Complexity follows the same distinction. An explicitly selected raw JSON option can still replace the lock list.
+
 ## Composition
 
 | Extension | Composition | Checks |

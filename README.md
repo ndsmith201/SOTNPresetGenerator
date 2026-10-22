@@ -104,7 +104,7 @@ If the source has no writes or an empty writes array, the generated copy starts 
 
 When selected options need injected startup code, the generated copy also adds a missing jump into that code and repairs the return jump and its following no-op independently. Missing item initialization and game initialization anchors are added when those placements need them. Existing anchors are reused, and ordinary patches do not add an unused startup routine.
 
-Generated copies omit `inherits`; the app does not recursively resolve another preset's inherited settings. They also replace the source's `lockLocation` with the bundled template's checks for the selected extension before applying starting-relic adjustments. Review the generated JSON when adapting presets with custom inheritance or access rules.
+Generated copies omit `inherits`; the app does not recursively resolve another preset's inherited settings. They use the bundled template's checks for the selected extension before applying starting-relic adjustments. If the source's `metadata.castleType` is `Modded` (case-insensitive), its matching `lockLocation` entries override the bundled rules in full; source locations outside the selected extension are omitted from the generated copy. Other castle types use the bundled rules. Review the generated JSON when adapting presets with custom inheritance or access rules.
 
 Catalog options whose complete writes or raw JSON settings match the source are selected automatically. Matching ignores write comments and hexadecimal case or padding, but checks addresses and every write in an option. Matched options reuse source entries instead of duplicating them. Unchecking a matched option removes its effect from the generated copy; startup instructions become no-ops where needed to preserve code positions. Later deselections persist across restarts.
 
@@ -327,6 +327,8 @@ Installers are currently unsigned; Windows may show an unknown-publisher warning
 ## Relic location reference
 
 The [check lists by extension](docs/relic-location-extensions.md) are available as `RELIC_LOCATION_CHECKS` in `src/renderer/relic-location-checks.ts`. Preview and export include only the selected extension's checks from the template, preserving their order and fields before applying starting-relic adjustments. Switching extensions rebuilds from the original template. Raw JSON lock overrides are also filtered to the selected extension. Complexity uses the same extension membership, including allowed checks after Trio. It recalculates on extension or starting-relic changes.
+
+For template copies with `metadata.castleType: "Modded"` (case-insensitive), matching source `lockLocation` entries override the selected extension's bundled defaults in full. Other selected locations use bundled rules, and source locations outside the extension are omitted from the output. The original source remains intact, so switching extensions restores any applicable custom entries. Custom source rules only remove requirements for relics the player actually starts with; normal-castle flight shortcuts still apply to bundled fallback rules. Complexity uses these same rules.
 
 Starting relics also clear a check's `escapeRequires` when any complete alternative is satisfied (all relics in a `+` combination must be enabled). Unsatisfied escape lists stay intact, entry locks remain independent, and deselecting relics restores the template requirements.
 
